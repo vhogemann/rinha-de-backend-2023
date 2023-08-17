@@ -1,8 +1,10 @@
 ﻿module App.Domain
 open System
+open System.Data
 open System.ComponentModel.DataAnnotations
 open Microsoft.EntityFrameworkCore
 open EntityFrameworkCore.FSharp.Extensions
+open Microsoft.EntityFrameworkCore.Query.SqlExpressions
 type [<CLIMutable>] Pessoa = {
     [<Key>]Id: Guid
     Apelido: string
@@ -39,7 +41,7 @@ let GetPessoa (ctx:DBContext) (id:Guid) = async {
 let FindPessoas (ctx:DBContext) (termo:string) =
         query {
             for pessoa in ctx.Pessoas do
-                where (pessoa.Apelido = apelido)
+                where (SqlMethods.Like(pessoa.Nome, termo) || SqlMethods.Like(pessoa.Apelido, termo))
                 select pessoa
         }
         |> Seq.toList
