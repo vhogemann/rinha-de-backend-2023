@@ -1,36 +1,46 @@
 ﻿module App.Domain
 open System
-open System.Data
 open System.ComponentModel.DataAnnotations
 open Microsoft.EntityFrameworkCore
 open EntityFrameworkCore.FSharp.Extensions
-open Microsoft.EntityFrameworkCore.Query.SqlExpressions
 type [<CLIMutable>] Pessoa = {
     [<Key>]Id: Guid
     Apelido: string
     Nome: string
     Nascimento: DateOnly
-    Stack: String list
+    Stack: String[]
+    SearchString: string
 }
-
-type DBContext(connectionString:string) =
+  
+type PessoaDbContext(connectionString:string) =
     inherit DbContext()
     [<DefaultValue>]
     val mutable pessoas: DbSet<Pessoa>
     member this.Pessoas with get() = this.pessoas and set(value) = this.pessoas <- value
     override _.OnModelCreating builder =
-        builder.RegisterOptionTypes()
+        builder
+            .Entity<Pessoa>()
+            .HasIndex("SearchString")
+            .HasOperators("text_pattern_ops")
+            |> ignore
+       
+        builder
+            .RegisterOptionTypes()
+            
     override _.OnConfiguring(optionsBuilder: DbContextOptionsBuilder) =
         optionsBuilder
             .UseNpgsql(connectionString) |> ignore
         
-let db = new DBContext("Host=localhost;Database=postgres;Username=postgres;Password=postgres")
-
-let SavePessoa pessoa =
-    db.Pessoas.Add(pessoa) |> ignore
-    db.SaveChangesAsync() |> Async.AwaitTask
+let CreatePessoa (ctx:PessoaDbContext) pessoa = async {
+    ctx.Pessoas.Add(pessoa) |> ignore
+    let! saved = ctx.SaveChangesAsync() |> Async.AwaitTask
+    return
+        match saved with
+        | 1 -> Some pessoa.Id
+        | _ -> None
+}
     
-let GetPessoa (ctx:DBContext) (id:Guid) = async {
+let GetPessoa (ctx:PessoaDbContext) (id:Guid) = async {
         let! pessoa = ctx.Pessoas.FindAsync(id).AsTask() |> Async.AwaitTask
         return
             match box pessoa with
@@ -38,10 +48,17 @@ let GetPessoa (ctx:DBContext) (id:Guid) = async {
             | _ -> Some pessoa
     }
 
-let FindPessoas (ctx:DBContext) (termo:string) =
+let SearchPessoa (ctx:PessoaDbContext) (term:string) =
         query {
             for pessoa in ctx.Pessoas do
-                where (SqlMethods.Like(pessoa.Nome, termo) || SqlMethods.Like(pessoa.Apelido, termo))
+                where (pessoa.SearchString.Contains(term))
                 select pessoa
         }
         |> Seq.toList
+        |> Seq.truncate 50
+        
+let CountPessoas (ctx:PessoaDbContext) =
+    query {
+        for pessoa in ctx.Pessoas do
+            count
+    }
