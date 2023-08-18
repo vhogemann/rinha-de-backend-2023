@@ -12,8 +12,8 @@ type [<CLIMutable>] Pessoa = {
     SearchString: string
 }
   
-type PessoaDbContext(connectionString:string) =
-    inherit DbContext()
+type PessoaDbContext(options:DbContextOptions<PessoaDbContext>) =
+    inherit DbContext(options)
     [<DefaultValue>]
     val mutable pessoas: DbSet<Pessoa>
     member this.Pessoas with get() = this.pessoas and set(value) = this.pessoas <- value
@@ -26,11 +26,7 @@ type PessoaDbContext(connectionString:string) =
        
         builder
             .RegisterOptionTypes()
-            
-    override _.OnConfiguring(optionsBuilder: DbContextOptionsBuilder) =
-        optionsBuilder
-            .UseNpgsql(connectionString) |> ignore
-        
+                 
 let CreatePessoa (ctx:PessoaDbContext) pessoa = async {
     ctx.Pessoas.Add(pessoa) |> ignore
     let! saved = ctx.SaveChangesAsync() |> Async.AwaitTask
@@ -53,9 +49,9 @@ let SearchPessoa (ctx:PessoaDbContext) (term:string) =
             for pessoa in ctx.Pessoas do
                 where (pessoa.SearchString.Contains(term))
                 select pessoa
+                take 50
         }
         |> Seq.toList
-        |> Seq.truncate 50
         
 let CountPessoas (ctx:PessoaDbContext) =
     query {
