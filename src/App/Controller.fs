@@ -42,15 +42,21 @@ type ViewPessoa = {
         }
 
 let CreatePessoaHandler (dbCtx:PessoaDbContext) =
+    let agent = MailboxProcessor.Start(fun inbox ->
+        let rec loop () = async {
+            let! pessoa = inbox.Receive()
+            do! CreatePessoa dbCtx pessoa
+            return! loop()
+        }
+        loop()
+    )
     let handleCreatePessoa (createPessoa:CreatePessoa) : HttpHandler =
         let person = createPessoa.AsPessoa
-        let result = CreatePessoa dbCtx person |> Async.RunSynchronously
-        match result with
-        | Some uid -> 
-            Response.withStatusCode 201
-            >> Response.withHeaders [ ("Location", "/pessoas/" + uid.ToString()) ]
-            >> Response.ofEmpty
-        | None -> Response.withStatusCode 500 >> Response.ofPlainText "Error saving pessoa to the database"
+        agent.Post(person)
+        (Response.withStatusCode 201
+         >> Response.withHeaders [ ("Location", $"/pessoas/{person.Id}") ]
+         >> Response.ofJson (ViewPessoa.FromPessoa person))
+        
     Request.mapJson handleCreatePessoa
     
 let GetPessoaHandler (dbCtx:PessoaDbContext) : HttpHandler = fun ctx ->
@@ -59,14 +65,14 @@ let GetPessoaHandler (dbCtx:PessoaDbContext) : HttpHandler = fun ctx ->
     let maybePessoa = GetPessoa dbCtx id |> Async.RunSynchronously
     match maybePessoa with
     | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson (ViewPessoa.FromPessoa pessoa)) ctx
-    | None ->  (Response.withStatusCode 404 >> Response.ofPlainText "Pessoa not found") ctx
+    | None ->  (Response.withStatusCode 404 >> Response.ofEmpty) ctx
     
 let SearchPessoasHandler (dbCtx:PessoaDbContext) : HttpHandler = fun ctx ->
     let r = Request.getQuery ctx
     let query = r.GetString "t"
     match query with
     | null 
-    | "" -> (Response.withStatusCode 400 >> Response.ofPlainText "Missing query parameter 't'") ctx
+    | "" -> (Response.withStatusCode 400 >> Response.ofEmpty) ctx
     | query ->
     let pessoas =
         SearchPessoa dbCtx query

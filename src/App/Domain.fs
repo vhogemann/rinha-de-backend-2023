@@ -1,8 +1,10 @@
 ﻿module App.Domain
 open System
+open System.Collections.Concurrent
 open System.ComponentModel.DataAnnotations
 open Microsoft.EntityFrameworkCore
 open EntityFrameworkCore.FSharp.Extensions
+open Microsoft.Extensions.Hosting
 type [<CLIMutable>] Pessoa = {
     [<Key>]Id: Guid
     Apelido: string
@@ -26,15 +28,11 @@ type PessoaDbContext(options:DbContextOptions<PessoaDbContext>) =
        
         builder
             .RegisterOptionTypes()
+            
                  
-let CreatePessoa (ctx:PessoaDbContext) pessoa = async {
+let CreatePessoa (ctx:PessoaDbContext) pessoa =
     ctx.Pessoas.Add(pessoa) |> ignore
-    let! saved = ctx.SaveChangesAsync() |> Async.AwaitTask
-    return
-        match saved with
-        | 1 -> Some pessoa.Id
-        | _ -> None
-}
+    ctx.SaveChangesAsync() |> Async.AwaitTask |> Async.Ignore
     
 let GetPessoa (ctx:PessoaDbContext) (id:Guid) = async {
         let! pessoa = ctx.Pessoas.FindAsync(id).AsTask() |> Async.AwaitTask
@@ -51,7 +49,6 @@ let SearchPessoa (ctx:PessoaDbContext) (term:string) =
                 select pessoa
                 take 50
         }
-        |> Seq.toList
         
 let CountPessoas (ctx:PessoaDbContext) =
     query {
