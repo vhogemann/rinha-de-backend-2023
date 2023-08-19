@@ -3,27 +3,46 @@
 open App.Domain
 open Falco
 open System
-
+let validateString len (aString:string): bool =
+    String.IsNullOrEmpty aString || aString.Length > len
+    |> not
 type CreatePessoa = {
-    Apelido: string
-    Nome: string
-    Nascimento: DateOnly
+    Apelido: string option
+    Nome: string option
+    Nascimento: string option
     Stack: String[] option
 } with
-    member this.AsPessoa =
-        let searchString =
-            this.Stack
-            |> Option.map (Array.reduce (fun acc x -> acc + " " + x))
-            |> Option.map (fun x -> this.Apelido + " " + this.Nome + " " + x)
-            |> Option.defaultValue (this.Apelido + " " + this.Nome)
-        {
-            Id = Guid.NewGuid()
-            Apelido = this.Apelido
-            Nome = this.Nome
-            Nascimento = this.Nascimento
-            Stack = this.Stack |> Option.defaultValue [||]
-            SearchString = searchString
-        }
+    member this.AsPessoa() =
+        match this.Apelido, this.Nome, this.Nascimento with
+        | Some apelido, Some nome, Some nascimento when
+            (validateString 32 apelido) && (validateString 100 nome) && (validateString 10 nascimento)->
+            let couldParse, nascimento = DateOnly.TryParse nascimento
+         
+            let validStack =
+                this.Stack
+                |> Option.map(Array.map(validateString 32) >> Array.reduce(fun acc x -> acc && x))
+                |> Option.defaultValue true
+            
+            if not couldParse || not validStack then
+                Error "Inválido"
+            else
+            
+            let searchString =
+                this.Stack
+                |> Option.map (Array.reduce (fun acc x -> acc + " " + x))
+                |> Option.map (fun x -> apelido + " " + nome + " " + x)
+                |> Option.defaultValue (apelido + " " + nome)
+            {
+                Id = Guid.NewGuid()
+                Apelido = apelido
+                Nome = nome
+                Nascimento = nascimento
+                Stack = this.Stack |> Option.defaultValue [||]
+                SearchString = searchString
+            }
+            |> Ok
+        | _ ->
+            Error "Inválido"
 
 type ViewPessoa = {
     Id: Guid
@@ -51,7 +70,13 @@ let CreatePessoaHandler (dbCtx:PessoaDbContext) =
         loop()
     )
     let handleCreatePessoa (createPessoa:CreatePessoa) : HttpHandler =
-        let person = createPessoa.AsPessoa
+        let person = createPessoa.AsPessoa()
+        
+        match person with
+        | Error message ->
+            (Response.withStatusCode 400 >> Response.ofPlainText message)
+        | Ok person ->
+            
         agent.Post(person)
         (Response.withStatusCode 201
          >> Response.withHeaders [ ("Location", $"/pessoas/{person.Id}") ]
