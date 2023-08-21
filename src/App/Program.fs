@@ -10,6 +10,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.Configuration
 open Microsoft.EntityFrameworkCore
 open Microsoft.Extensions.DependencyInjection
+open StackExchange.Redis
 
 let ensureDatabaseCreated (builder:IApplicationBuilder) =
     use serviceScope = builder.ApplicationServices.CreateScope()
@@ -20,9 +21,9 @@ let ensureDatabaseCreated (builder:IApplicationBuilder) =
 [<EntryPoint>]
 let main args =
     
-    let createPessoa = Services.inject<PessoaDbContext> CreatePessoaHandler
-    let getPessoa = Services.inject<PessoaDbContext> GetPessoaHandler
-    let searchPessoas = Services.inject<PessoaDbContext> SearchPessoasHandler
+    let createPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> CreatePessoaHandler
+    let getPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> GetPessoaHandler
+    let searchPessoas = Services.inject<PessoaDbContext,ConnectionMultiplexer> SearchPessoasHandler
     let countPessoas = Services.inject<PessoaDbContext> CountPessoasHandler
     
     let config = 
@@ -33,9 +34,13 @@ let main args =
     webHost args {
         
         add_service (fun services ->
-            services.AddDbContext<PessoaDbContext>(fun builder ->
-                builder.UseNpgsql(config.GetConnectionString("Default")) |> ignore
-            )
+            services
+                .AddDbContext<PessoaDbContext>(fun builder ->
+                    builder.UseNpgsql(config.GetConnectionString("Default")) |> ignore
+                )
+                .AddSingleton<ConnectionMultiplexer>(fun _ ->
+                    ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
+                )
         )
 
         use_if FalcoExtensions.IsDevelopment ensureDatabaseCreated

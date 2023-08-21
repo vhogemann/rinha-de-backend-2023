@@ -1,17 +1,17 @@
 ﻿module App.Domain
 open System
-open System.Collections.Concurrent
 open System.ComponentModel.DataAnnotations
 open Microsoft.EntityFrameworkCore
 open EntityFrameworkCore.FSharp.Extensions
-open Microsoft.Extensions.Hosting
+open System.Linq
+open NpgsqlTypes
 type [<CLIMutable>] Pessoa = {
     [<Key>]Id: Guid
     Apelido: string
     Nome: string
     Nascimento: DateOnly
     Stack: String[]
-    SearchString: string
+    StackSearch: string
 }
   
 type PessoaDbContext(options:DbContextOptions<PessoaDbContext>) =
@@ -22,33 +22,36 @@ type PessoaDbContext(options:DbContextOptions<PessoaDbContext>) =
     override _.OnModelCreating builder =
         builder
             .Entity<Pessoa>()
-            .HasIndex("SearchString")
-            .HasOperators("text_pattern_ops")
+            .HasIndex("Apelido", "Nome", "StackSearch")
+            .HasMethod("GIN")
+            .IsTsVectorExpressionIndex("english")
             |> ignore
-       
+            
         builder
             .RegisterOptionTypes()
             
                  
 let CreatePessoa (ctx:PessoaDbContext) pessoa =
     ctx.Pessoas.Add(pessoa) |> ignore
-    ctx.SaveChangesAsync() |> Async.AwaitTask |> Async.Ignore
+    ctx.SaveChanges()
     
-let GetPessoa (ctx:PessoaDbContext) (id:Guid) = async {
-        let! pessoa = ctx.Pessoas.FindAsync(id).AsTask() |> Async.AwaitTask
-        return
-            match box pessoa with
-            | null -> None
-            | _ -> Some pessoa
-    }
+let GetPessoa (ctx:PessoaDbContext) (id:Guid) =
+    let result = ctx.Pessoas.Find(id)
+    match box result with
+    | null -> None
+    | _ -> Some result
+
+let ExistsPessoaByApelido (ctx:PessoaDbContext) (apelido:string) =
+    query {
+        for pessoa in ctx.Pessoas do
+        where (pessoa.Apelido = apelido)
+        count
+    } > 1
 
 let SearchPessoa (ctx:PessoaDbContext) (term:string) =
-        query {
-            for pessoa in ctx.Pessoas do
-                where (pessoa.SearchString.Contains(term))
-                select pessoa
-                take 50
-        }
+    ctx.Pessoas
+        .Where(fun p -> EF.Functions.ToTsVector("english",p.Apelido + " " + p.Nome + " " + p.StackSearch).Matches($"{term}:*"))
+        .ToList()
         
 let CountPessoas (ctx:PessoaDbContext) =
     query {
