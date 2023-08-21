@@ -24,7 +24,9 @@ module Pessoa =
         }
 
 let insert (conn:NpgsqlConnection) person =
-    let sql = "INSERT INTO Pessoa (Id, Apelido, Nome, Nascimento, Stack)"
+    let sql = """
+        INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack)
+    """
     let param = [
         "Id", sqlGuid person.Id
         "Apelido", sqlString person.Apelido
@@ -39,7 +41,9 @@ let insert (conn:NpgsqlConnection) person =
     |> Db.exec
     
 let fetch (conn:NpgsqlConnection) id =
-    let sql = "SELECT Id, Apelido, Nome, Nascimento, Stack FROM Pessoa"
+    let sql = """
+    SELECT "Id", "Apelido", "Nome", "Nascimento", "Stack" FROM "Pessoas"
+    """
     let param = [
         "Id", sqlGuid id
     ]
@@ -52,11 +56,11 @@ let fetch (conn:NpgsqlConnection) id =
 let search (conn:NpgsqlConnection) termo =
     let sql = """
     SELECT
-      Id, Apelido, Nome, Nascimento, Stack 
+      "Id", "Apelido", "Nome", "Nascimento", "Stack" 
     FROM 
-      Pessoas 
+      "Pessoas" 
     WHERE 
-      BUSCA ILIKE '%' || @Termo || '%'
+      "Busca" ILIKE '%' || @Termo || '%'
       limit 50;
     """
     let param = [
@@ -69,8 +73,8 @@ let search (conn:NpgsqlConnection) termo =
     |> Db.query Pessoa.ofDataReader
     
 let count (conn:NpgsqlConnection) =
-    let sql = "SELECT count(*) From Pessoas"
+    let sql = "SELECT count(*) From \"Pessoas\""
     
     conn
     |> Db.newCommand sql
-    |> Db.scalar (fun it -> it :? Int64) 
+    |> Db.scalar unbox<Int64> 
