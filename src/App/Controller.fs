@@ -1,14 +1,13 @@
 ﻿module App.Controller
 
-open System
 open System.Text.Json
 open App.Domain
 open App.ViewModel
 open Falco
 
 let CreatePessoaHandler (dbCtx:PessoaDbContext) redis =
-    let apelidoExists =
-        Cache.memoize redis (fun apelido -> ExistsPessoaByApelido dbCtx apelido)
+    let apelidoExists apelido =
+        Cache.get redis apelido |> Option.isSome
     
     let handleCreatePessoa (createPessoa:CreatePessoa) : HttpHandler =
         match asPessoa createPessoa with
@@ -19,6 +18,7 @@ let CreatePessoaHandler (dbCtx:PessoaDbContext) redis =
         if (apelidoExists pessoa.Apelido) then
             (Response.withStatusCode 422 >> Response.ofEmpty)
         else
+        Cache.addPerson redis (ViewPessoa.FromPessoa pessoa)
         CreatePessoa dbCtx pessoa |> ignore
         (Response.withStatusCode 201
          >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
@@ -28,8 +28,8 @@ let CreatePessoaHandler (dbCtx:PessoaDbContext) redis =
     with
     | :? JsonException as ex -> (Response.withStatusCode 400 >> Response.ofPlainText ex.Message)
 
-let GetPessoaHandler (dbCtx:PessoaDbContext) redis : HttpHandler =
-    let getPessoa = Cache.memoize redis (GetPessoa dbCtx)
+let GetPessoaHandler (dbCtx:PessoaDbContext) : HttpHandler =
+    let getPessoa = GetPessoa dbCtx
     fun ctx ->
         let r = Request.getRoute ctx
         let id = r.GetGuid "id"
@@ -39,11 +39,7 @@ let GetPessoaHandler (dbCtx:PessoaDbContext) redis : HttpHandler =
         | None ->  (Response.withStatusCode 404 >> Response.ofEmpty) ctx
     
 let SearchPessoasHandler (dbCtx:PessoaDbContext) redis : HttpHandler =
-    let searchPessoa =
-        Cache.memoize redis (fun query ->
-            SearchPessoa dbCtx query
-            |> Seq.map ViewPessoa.FromPessoa
-            |> Array.ofSeq)
+    let searchPessoa = Cache.searchPerson redis 
     fun ctx ->
         let r = Request.getQuery ctx
         let query = r.GetString "t"

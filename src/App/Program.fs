@@ -21,16 +21,16 @@ let ensureDatabaseCreated (builder:IApplicationBuilder) =
 [<EntryPoint>]
 let main args =
     
-    let createPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> CreatePessoaHandler
-    let getPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> GetPessoaHandler
-    let searchPessoas = Services.inject<PessoaDbContext,ConnectionMultiplexer> SearchPessoasHandler
-    let countPessoas = Services.inject<PessoaDbContext> CountPessoasHandler
-    
     let config = 
         ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
-
+    
+    let createPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> CreatePessoaHandler
+    let getPessoa = Services.inject<PessoaDbContext> GetPessoaHandler
+    let searchPessoas = Services.inject<PessoaDbContext,ConnectionMultiplexer> SearchPessoasHandler
+    let countPessoas = Services.inject<PessoaDbContext> CountPessoasHandler
+    
     webHost args {
         
         add_service (fun services ->
@@ -39,7 +39,9 @@ let main args =
                     builder.UseNpgsql(config.GetConnectionString("Default")) |> ignore
                 )
                 .AddSingleton<ConnectionMultiplexer>(fun _ ->
-                    ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
+                    let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
+                    Cache.createPersonIndex redis
+                    redis
                 )
         )
 

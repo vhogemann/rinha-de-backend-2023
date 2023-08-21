@@ -28,5 +28,17 @@
   <ItemGroup>
     <Content Include=".dockerignore" />
     <Content Include="Dockerfile" />
+    <Content Include="..\..\bootstrap.sql">
+      <Link>External Items\bootstrap.sql</Link>
+    </Content>
+    <Content Include="..\..\docker-compose.yml">
+      <Link>External Items\docker-compose.yml</Link>
+    </Content>
+    <Content Include="..\..\nginx.conf">
+      <Link>External Items\nginx.conf</Link>
+    </Content>
+    <Content Include="..\..\README.md">
+      <Link>External Items\README.md</Link>
+    </Content>
   </ItemGroup>
 </Project>
