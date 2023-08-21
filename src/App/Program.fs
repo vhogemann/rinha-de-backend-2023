@@ -1,23 +1,13 @@
 module App.Program
 
-open System
 open Falco
 open Falco.Routing
 open Falco.HostBuilder
-open App.Domain
 open App.Controller
-open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.Configuration
-open Microsoft.EntityFrameworkCore
 open Microsoft.Extensions.DependencyInjection
+open Npgsql
 open StackExchange.Redis
-
-let ensureDatabaseCreated (builder:IApplicationBuilder) =
-    use serviceScope = builder.ApplicationServices.CreateScope()
-    let db = serviceScope.ServiceProvider.GetService<PessoaDbContext>()
-    db.Database.EnsureCreated() |> ignore
-    builder
-
 [<EntryPoint>]
 let main args =
     
@@ -26,26 +16,20 @@ let main args =
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
     
-    let createPessoa = Services.inject<PessoaDbContext,ConnectionMultiplexer> CreatePessoaHandler
-    let getPessoa = Services.inject<PessoaDbContext> GetPessoaHandler
-    let searchPessoas = Services.inject<PessoaDbContext,ConnectionMultiplexer> SearchPessoasHandler
-    let countPessoas = Services.inject<PessoaDbContext> CountPessoasHandler
+    let createPessoa = Services.inject<NpgsqlConnection,ConnectionMultiplexer> CreatePessoaHandler
+    let getPessoa = Services.inject<NpgsqlConnection> GetPessoaHandler
+    let searchPessoas = Services.inject<NpgsqlConnection,ConnectionMultiplexer> SearchPessoasHandler
+    let countPessoas = Services.inject<NpgsqlConnection> CountPessoasHandler
     
     webHost args {
         
         add_service (fun services ->
             services
-                .AddDbContext<PessoaDbContext>(fun builder ->
-                    builder.UseNpgsql(config.GetConnectionString("Default")) |> ignore
-                )
+                .AddNpgsqlDataSource(config.GetConnectionString("Default"))
                 .AddSingleton<ConnectionMultiplexer>(fun _ ->
-                    let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
-                    Cache.createPersonIndex redis
-                    redis
+                    ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
                 )
         )
-
-        use_if FalcoExtensions.IsDevelopment ensureDatabaseCreated
 
         endpoints [
             post "/pessoas" createPessoa

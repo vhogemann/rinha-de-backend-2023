@@ -1,60 +1,76 @@
 ﻿module App.Domain
+
 open System
-open System.ComponentModel.DataAnnotations
-open Microsoft.EntityFrameworkCore
-open EntityFrameworkCore.FSharp.Extensions
-open System.Linq
-open NpgsqlTypes
-type [<CLIMutable>] Pessoa = {
-    [<Key>]Id: Guid
+open System.Data
+open System.Text.Json
+open Donald
+open Npgsql
+
+type Pessoa = {
+    Id: Guid
     Apelido: string
     Nome: string
-    Nascimento: DateOnly
+    Nascimento: DateTime
     Stack: String[]
-    StackSearch: string
 }
-  
-type PessoaDbContext(options:DbContextOptions<PessoaDbContext>) =
-    inherit DbContext(options)
-    [<DefaultValue>]
-    val mutable pessoas: DbSet<Pessoa>
-    member this.Pessoas with get() = this.pessoas and set(value) = this.pessoas <- value
-    override _.OnModelCreating builder =
-        builder
-            .Entity<Pessoa>()
-            .HasIndex("Apelido", "Nome", "StackSearch")
-            .HasMethod("GIN")
-            .IsTsVectorExpressionIndex("english")
-            |> ignore
-            
-        builder
-            .RegisterOptionTypes()
-            
-                 
-let CreatePessoa (ctx:PessoaDbContext) pessoa =
-    ctx.Pessoas.Add(pessoa) |> ignore
-    ctx.SaveChanges()
+module Pessoa =
+    let ofDataReader (rd:IDataReader): Pessoa =
+        {
+            Id = rd.ReadGuid "Id"
+            Apelido = rd.ReadString "Apelido"
+            Nome = rd.ReadString "Nome"
+            Nascimento = rd.ReadDateTime "Nascimento" 
+            Stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
+        }
+
+let insert (conn:NpgsqlConnection) person =
+    let sql = "INSERT INTO Pessoa (Id, Apelido, Nome, Nascimento, Stack)"
+    let param = [
+        "Id", sqlGuid person.Id
+        "Apelido", sqlString person.Apelido
+        "Nome", sqlString person.Nome
+        "Nascimento", sqlDateTime (person.Nascimento)
+        "Stack", sqlString (person.Stack |> JsonSerializer.Serialize)
+    ]
     
-let GetPessoa (ctx:PessoaDbContext) (id:Guid) =
-    let result = ctx.Pessoas.Find(id)
-    match box result with
-    | null -> None
-    | _ -> Some result
-
-let ExistsPessoaByApelido (ctx:PessoaDbContext) (apelido:string) =
-    query {
-        for pessoa in ctx.Pessoas do
-        where (pessoa.Apelido = apelido)
-        count
-    } > 1
-
-let SearchPessoa (ctx:PessoaDbContext) (term:string) =
-    ctx.Pessoas
-        .Where(fun p -> EF.Functions.ToTsVector("english",p.Apelido + " " + p.Nome + " " + p.StackSearch).Matches($"{term}:*"))
-        .ToList()
-        
-let CountPessoas (ctx:PessoaDbContext) =
-    query {
-        for pessoa in ctx.Pessoas do
-            count
-    }
+    conn
+    |> Db.newCommand sql
+    |> Db.setParams param
+    |> Db.exec
+    
+let fetch (conn:NpgsqlConnection) id =
+    let sql = "SELECT Id, Apelido, Nome, Nascimento, Stack FROM Pessoa"
+    let param = [
+        "Id", sqlGuid id
+    ]
+    
+    conn
+    |> Db.newCommand sql
+    |> Db.setParams param
+    |> Db.querySingle Pessoa.ofDataReader
+    
+let search (conn:NpgsqlConnection) termo =
+    let sql = """
+    SELECT
+      Id, Apelido, Nome, Nascimento, Stack 
+    FROM 
+      Pessoas 
+    WHERE 
+      BUSCA ILIKE '%' || @Termo || '%'
+      limit 50;
+    """
+    let param = [
+        "Termo", sqlString termo
+    ]
+    
+    conn
+    |> Db.newCommand sql
+    |> Db.setParams param
+    |> Db.query Pessoa.ofDataReader
+    
+let count (conn:NpgsqlConnection) =
+    let sql = "SELECT count(*) From Pessoas"
+    
+    conn
+    |> Db.newCommand sql
+    |> Db.scalar (fun it -> it :? Int64) 

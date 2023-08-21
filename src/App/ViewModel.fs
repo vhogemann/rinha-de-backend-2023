@@ -9,21 +9,7 @@ type CreatePessoa = {
     Nascimento: string option
     Stack: String[] option
 }
-type ViewPessoa = {
-    Id: Guid
-    Apelido: string
-    Nome: string
-    Nascimento: DateOnly
-    Stack: String[]
-} with
-    static member FromPessoa (pessoa:Pessoa) =
-        {
-            Id = pessoa.Id
-            Apelido = pessoa.Apelido
-            Nome = pessoa.Nome
-            Nascimento = pessoa.Nascimento
-            Stack = pessoa.Stack
-        }
+
 let validateString len (aString:string): bool =
     (String.IsNullOrEmpty aString || aString.Length > len)
     |> not
@@ -37,7 +23,7 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, string> =
     let nascimento =
         pessoa.Nascimento
         |> Option.bind( fun nascimento ->
-            match DateOnly.TryParse(nascimento) with
+            match DateTime.TryParse(nascimento) with
             | true, value -> Some value
             | _ -> None)
     
@@ -54,7 +40,6 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, string> =
             Nome = nome
             Nascimento = nascimento
             Stack = (stack |> Option.defaultValue [||])
-            StackSearch = searchString 
         }
         Ok result
     | _ ->
