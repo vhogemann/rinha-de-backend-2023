@@ -7,7 +7,7 @@ open App.Controller
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Npgsql
-open StackExchange.Redis
+
 [<EntryPoint>]
 let main args =
     
@@ -16,9 +16,9 @@ let main args =
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
     
-    let createPessoa = Services.inject<NpgsqlConnection,ConnectionMultiplexer> CreatePessoaHandler
+    let createPessoa = Services.inject<NpgsqlConnection> CreatePessoaHandler
     let getPessoa = Services.inject<NpgsqlConnection> GetPessoaHandler
-    let searchPessoas = Services.inject<NpgsqlConnection,ConnectionMultiplexer> SearchPessoasHandler
+    let searchPessoas = Services.inject<NpgsqlConnection> SearchPessoasHandler
     let countPessoas = Services.inject<NpgsqlConnection> CountPessoasHandler
     
     webHost args {
@@ -26,9 +26,6 @@ let main args =
         add_service (fun services ->
             services
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
-                .AddSingleton<ConnectionMultiplexer>(fun _ ->
-                    ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
-                )
         )
 
         endpoints [

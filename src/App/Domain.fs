@@ -52,6 +52,20 @@ let fetch (conn:NpgsqlConnection) id =
     |> Db.newCommand sql
     |> Db.setParams param
     |> Db.querySingle Pessoa.ofDataReader
+
+let apelidoExists (conn:NpgsqlConnection) apelido =
+    let sql = """
+        SELECT count(*) FROM "Pessoas" WHERE "Apelido" = @Apelido
+    """
+    let param = [
+        "Apelido", sqlString apelido
+    ]
+    
+    conn
+    |> Db.newCommand sql
+    |> Db.setParams param
+    |> Db.scalar unbox<Int64>
+    |> (>=) 1L
     
 let search (conn:NpgsqlConnection) termo =
     let sql = """

@@ -18,4 +18,5 @@ CREATE TABLE "Pessoas" (
     "Busca" text GENERATED ALWAYS AS ( "Nome" || ' ' || "Apelido" || ' ' || "Stack" ) STORED 
 );
 
+CREATE INDEX PESSOAS_APELIDO_INDEX ON "Pessoas" ("Apelido");
 CREATE INDEX PESSOAS_SEARCH_INDEX ON "Pessoas" USING GIST ("Busca" gist_trgm_ops);

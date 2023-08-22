@@ -8,7 +8,6 @@
   <ItemGroup>
     <Compile Include="Domain.fs" />
     <Compile Include="ViewModel.fs" />
-    <Compile Include="Cache.fs" />
     <Compile Include="Controller.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
