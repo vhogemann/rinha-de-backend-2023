@@ -23,8 +23,8 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, string> =
     let nascimento =
         pessoa.Nascimento
         |> Option.bind( fun nascimento ->
-            match DateTime.TryParse(nascimento) with
-            | true, value -> Some (value.ToUniversalTime())
+            match DateOnly.TryParse(nascimento) with
+            | true, value -> Some (value.ToDateTime(TimeOnly.MinValue).ToUniversalTime())
             | _ -> None)
     
     match pessoa.Nome, pessoa.Apelido, pessoa.Stack, nascimento with

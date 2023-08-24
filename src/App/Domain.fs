@@ -60,12 +60,12 @@ let apelidoExists (conn:NpgsqlConnection) apelido =
     let param = [
         "Apelido", sqlString apelido
     ]
-    
-    conn
-    |> Db.newCommand sql
-    |> Db.setParams param
-    |> Db.scalar unbox<Int64>
-    |> (>=) 1L
+    let count = 
+        conn
+        |> Db.newCommand sql
+        |> Db.setParams param
+        |> Db.scalar unbox<Int64>
+    count > 0L
     
 let search (conn:NpgsqlConnection) termo =
     let sql = """

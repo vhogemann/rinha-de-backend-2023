@@ -1,37 +1,43 @@
 ﻿module App.Controller
 
-open System.Net.Http
-open System.Text.Json
-open App.ViewModel
+open System.Text.Json.Serialization
+open App
+open App.Domain
 open Falco
-open Microsoft.AspNetCore.Http
+open System.Text.Json
 
 let CreatePessoaHandler db :HttpHandler =
+    let options = JsonSerializerOptions()
+    options.Converters.Add(JsonFSharpConverter())
+    options.AllowTrailingCommas <- true
+    options.PropertyNameCaseInsensitive <- true
     let apelidoExists = Domain.apelidoExists db
     
-    let handleCreatePessoa ctx (createPessoa:CreatePessoa) =
-        match asPessoa createPessoa with
+    let deserializePessoa (body:string) =
+        try 
+            JsonSerializer.Deserialize<ViewModel.CreatePessoa>(body, options) |> Ok
+        with exp ->
+            Error exp.Message
+    
+    let handleCreatePessoa (body:string) =
+        let createPessoa =
+            body
+            |> deserializePessoa
+            |> Result.bind ViewModel.asPessoa
+        match createPessoa with
         | Error message ->
-            (Response.withStatusCode 400 >> Response.ofPlainText message) ctx
+            (Response.withStatusCode 400 >> Response.ofPlainText message)
         | Ok pessoa ->
         
         if (apelidoExists pessoa.Apelido) then
-            (Response.withStatusCode 422 >> Response.ofEmpty) ctx
+            (Response.withStatusCode 422 >> Response.ofEmpty)
         else
         Domain.insert db pessoa
         (Response.withStatusCode 201
          >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
-         >> Response.ofEmpty) ctx
+         >> Response.ofEmpty)
     
-    fun ctx -> 
-        try
-           ctx.Request.Body |> JsonSerializer.DeserializeAsync<CreatePessoa>
-           |> fun task -> task.AsTask()
-           |> Async.AwaitTask
-           |> Async.RunSynchronously
-           |> handleCreatePessoa ctx
-        with exp ->
-            (Response.withStatusCode 400 >> Response.ofEmpty) ctx
+    Request.bodyString handleCreatePessoa
             
 let GetPessoaHandler db : HttpHandler =
     fun ctx ->
