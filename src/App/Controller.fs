@@ -2,51 +2,66 @@
 
 open System.Text.Json.Serialization
 open App
-open App.Domain
 open Falco
 open System.Text.Json
 
-let CreatePessoaHandler db :HttpHandler =
-    let options = JsonSerializerOptions()
-    options.Converters.Add(JsonFSharpConverter())
-    options.AllowTrailingCommas <- true
-    options.PropertyNameCaseInsensitive <- true
-    let apelidoExists = Domain.apelidoExists db
-    
-    let deserializePessoa (body:string) =
-        try 
-            JsonSerializer.Deserialize<ViewModel.CreatePessoa>(body, options) |> Ok
-        with exp ->
-            Error exp.Message
-    
-    let handleCreatePessoa (body:string) =
-        let createPessoa =
-            body
-            |> deserializePessoa
-            |> Result.bind ViewModel.asPessoa
-        match createPessoa with
-        | Error message ->
-            (Response.withStatusCode 400 >> Response.ofPlainText message)
-        | Ok pessoa ->
-        
-        if (apelidoExists pessoa.Apelido) then
-            (Response.withStatusCode 422 >> Response.ofEmpty)
+module CreatePessoa =
+    let deserialize:string->Result<ViewModel.CreatePessoa, int> =
+        let options = JsonSerializerOptions()
+        options.Converters.Add(JsonFSharpConverter())
+        options.AllowTrailingCommas <- true
+        options.PropertyNameCaseInsensitive <- true
+        fun json ->
+            try 
+                JsonSerializer.Deserialize<ViewModel.CreatePessoa> json |> Ok
+            with exp ->
+                Error 400
+    let exists db (pessoa:ViewModel.CreatePessoa) =
+        if Domain.apelidoExists db pessoa.Apelido then
+            Error 422
         else
-        Domain.insert db pessoa
-        (Response.withStatusCode 201
-         >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
-         >> Response.ofEmpty)
+            Ok pessoa
     
-    Request.bodyString handleCreatePessoa
+    let insert db pessoa =
+        try
+            Domain.insert db pessoa
+            Ok pessoa            
+        with exp ->
+            Error 500
             
-let GetPessoaHandler db : HttpHandler =
-    fun ctx ->
-        let r = Request.getRoute ctx
-        let id = r.GetGuid "id"
-        let maybePessoa = Domain.fetch db id
-        match maybePessoa with
-        | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa) ctx
-        | None ->  (Response.withStatusCode 404 >> Response.ofEmpty) ctx
+    let handler db pessoa =
+        pessoa
+        |> deserialize
+        |> Result.bind (exists db)
+        |> Result.bind (ViewModel.asPessoa)
+        |> Result.bind (insert db)
+        |> function
+            | Error status ->
+                (Response.withStatusCode status >> Response.ofEmpty)
+            | Ok pessoa ->
+                (Response.withStatusCode 201
+                 >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
+                 >> Response.ofEmpty)
+let CreatePessoaHandler db :HttpHandler = Request.bodyString (CreatePessoa.handler db)
+
+module GetPessoa =
+    let getId = Request.mapRoute (fun r -> r.GetGuid "id")
+        
+    let getPessoa db id =
+        match Domain.fetch db id with
+        | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa)
+        | None -> (Response.withStatusCode 404 >> Response.ofEmpty)
+    
+let GetPessoaHandler db : HttpHandler = GetPessoa.getId (GetPessoa.getPessoa db)
+    
+module SearchPessoa =
+    let search db term =
+        Domain.search db term
+    
+    
+    
+
+    
     
 let SearchPessoasHandler db : HttpHandler =
     fun ctx ->
