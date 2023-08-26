@@ -40,6 +40,7 @@ let insert (conn:NpgsqlConnection) person =
     |> Db.newCommand sql
     |> Db.setParams param
     |> Db.Async.exec
+    |> Async.AwaitTask
 
 let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
