@@ -18,7 +18,9 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
     let validNome = validateString 100
     let validApelido = validateString 32
     let validStack =
-        Option.map (Array.map(validateString 32) >> Array.reduce(fun acc x -> acc && x))
+        Option.map (fun arr ->
+            if Array.isEmpty arr then true else 
+            arr |> (Array.map(validateString 32) >> Array.reduce(fun acc x -> acc && x)))
         >> Option.defaultValue true
     let nascimento =
         pessoa.Nascimento
@@ -32,10 +34,6 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
     match pessoa.Nome, pessoa.Apelido, pessoa.Stack, nascimento with
     | Some nome, Some apelido, stack, Some nascimento
         when validNome nome && validApelido apelido && validStack stack ->
-        let searchString =
-            stack
-            |> Option.map (Array.reduce (fun acc x -> acc + " " + x))
-            |> Option.defaultValue null
         let result:Pessoa = {
             Id = Guid.NewGuid()
             Apelido = apelido

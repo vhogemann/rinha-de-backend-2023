@@ -21,10 +21,18 @@ let Setup () =
 [<Test>]
 let ``Test CreatePessoa.AsPessoa`` () =
     let json ="""{"apelido" : "xpto", "nome" : "xpto xpto", "nascimento" : "2000-01-01", "stack": null}"""
+   
+    let pessoa =
+        JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, options)
+        |> ViewModel.asPessoa
     
-    let createPessoa = JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, options)
+    test <@ Result.isOk pessoa @>
     
-    let pessoa = ViewModel.asPessoa createPessoa
+    let json ="""{"apelido" : "xpto", "nome" : "xpto xpto", "nascimento" : "2000-01-01", "stack": []}"""
+    
+    let pessoa =
+        JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, options)
+        |> ViewModel.asPessoa
     
     test <@ Result.isOk pessoa @>
     
