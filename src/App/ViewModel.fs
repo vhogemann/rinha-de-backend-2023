@@ -14,7 +14,7 @@ let validateString len (aString:string): bool =
     (String.IsNullOrEmpty aString || aString.Length > len)
     |> not
     
-let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int> =
+let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
     let validNome = validateString 100
     let validApelido = validateString 32
     let validStack =
@@ -43,4 +43,4 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int> =
         }
         Ok result
     | _ ->
-        Error 400
+        Error (400, "Json invalido")

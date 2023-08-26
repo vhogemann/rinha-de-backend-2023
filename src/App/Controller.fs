@@ -6,7 +6,7 @@ open Falco
 open System.Text.Json
 
 module CreatePessoa =
-    let deserialize:string->Result<ViewModel.CreatePessoa, int> =
+    let deserialize:string->Result<ViewModel.CreatePessoa, int*string> =
         let options = JsonSerializerOptions()
         options.Converters.Add(JsonFSharpConverter())
         options.AllowTrailingCommas <- true
@@ -15,10 +15,10 @@ module CreatePessoa =
             try 
                 JsonSerializer.Deserialize<ViewModel.CreatePessoa> json |> Ok
             with exp ->
-                Error 400
+                Error (400, exp.Message)
     let exists db (pessoa:ViewModel.CreatePessoa) =
         if Domain.apelidoExists db pessoa.Apelido then
-            Error 422
+            Error (422, "Apelido existe")
         else
             Ok pessoa
     
@@ -27,7 +27,7 @@ module CreatePessoa =
             queue pessoa
             Ok pessoa            
         with exp ->
-            Error 500
+            Error (500, exp.Message)
             
     let handler db =
         let queue =
@@ -40,8 +40,8 @@ module CreatePessoa =
             |> Result.bind (ViewModel.asPessoa)
             |> Result.bind (insert queue)
             |> function
-                | Error status ->
-                    (Response.withStatusCode status >> Response.ofEmpty)
+                | Error (status, message) ->
+                    (Response.withStatusCode status >> Response.ofPlainText message)
                 | Ok pessoa ->
                     (Response.withStatusCode 201
                      >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
