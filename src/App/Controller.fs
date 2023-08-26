@@ -22,26 +22,30 @@ module CreatePessoa =
         else
             Ok pessoa
     
-    let insert db pessoa =
+    let insert queue pessoa =
         try
-            Domain.queueInsert (Domain.insert db) pessoa
+            queue pessoa
             Ok pessoa            
         with exp ->
             Error 500
             
-    let handler db pessoa =
-        pessoa
-        |> deserialize
-        |> Result.bind (exists db)
-        |> Result.bind (ViewModel.asPessoa)
-        |> Result.bind (insert db)
-        |> function
-            | Error status ->
-                (Response.withStatusCode status >> Response.ofEmpty)
-            | Ok pessoa ->
-                (Response.withStatusCode 201
-                 >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
-                 >> Response.ofEmpty)
+    let handler db =
+        let queue =
+            Domain.queueInsert (Domain.insert db)
+            
+        fun pessoa ->
+            pessoa
+            |> deserialize
+            |> Result.bind (exists db)
+            |> Result.bind (ViewModel.asPessoa)
+            |> Result.bind (insert queue)
+            |> function
+                | Error status ->
+                    (Response.withStatusCode status >> Response.ofEmpty)
+                | Ok pessoa ->
+                    (Response.withStatusCode 201
+                     >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
+                     >> Response.ofEmpty)
 let CreatePessoaHandler db :HttpHandler = Request.bodyString (CreatePessoa.handler db)
 
 module GetPessoa =
