@@ -24,6 +24,7 @@ module Pessoa =
         }
 
 let insert (conn:NpgsqlConnection) person =
+    Console.Out.WriteLine $"%A{person}"
     let sql = """
         INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack)
     """
@@ -38,14 +39,14 @@ let insert (conn:NpgsqlConnection) person =
     conn
     |> Db.newCommand sql
     |> Db.setParams param
-    |> Db.exec
+    |> Db.Async.exec
 
 let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
         let rec loop() = async {
            let! pessoa = inbox.Receive()
-           try 
-            insert pessoa
+           try
+            do! insert pessoa
            with exp ->
                Console.Out.WriteLine (exp.Message)
            do! loop() 
