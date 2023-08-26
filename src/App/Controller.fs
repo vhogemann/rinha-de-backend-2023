@@ -13,7 +13,7 @@ module CreatePessoa =
         options.PropertyNameCaseInsensitive <- true
         fun json ->
             try 
-                JsonSerializer.Deserialize<ViewModel.CreatePessoa> json |> Ok
+                JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, options)|> Ok
             with exp ->
                 Error (400, exp.Message)
     let exists db (pessoa:ViewModel.CreatePessoa) =
