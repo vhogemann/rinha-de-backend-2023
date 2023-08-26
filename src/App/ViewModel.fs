@@ -25,7 +25,9 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
         |> Option.bind( fun nascimento ->
             match DateOnly.TryParse(nascimento) with
             | true, value -> Some (value.ToDateTime(TimeOnly.MinValue).ToUniversalTime())
-            | _ -> None)
+            | _ ->
+                System.Console.WriteLine("Data invalida")
+                None)
     
     match pessoa.Nome, pessoa.Apelido, pessoa.Stack, nascimento with
     | Some nome, Some apelido, stack, Some nascimento
