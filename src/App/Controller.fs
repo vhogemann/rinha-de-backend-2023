@@ -24,7 +24,7 @@ module CreatePessoa =
     
     let insert db pessoa =
         try
-            Domain.insert db pessoa
+            Domain.queueInsert (Domain.insert db) pessoa
             Ok pessoa            
         with exp ->
             Error 500
@@ -53,15 +53,6 @@ module GetPessoa =
         | None -> (Response.withStatusCode 404 >> Response.ofEmpty)
     
 let GetPessoaHandler db : HttpHandler = GetPessoa.getId (GetPessoa.getPessoa db)
-    
-module SearchPessoa =
-    let search db term =
-        Domain.search db term
-    
-    
-    
-
-    
     
 let SearchPessoasHandler db : HttpHandler =
     fun ctx ->

@@ -39,7 +39,20 @@ let insert (conn:NpgsqlConnection) person =
     |> Db.newCommand sql
     |> Db.setParams param
     |> Db.exec
-    
+
+let queueInsert insert =
+    let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
+        let rec loop() = async {
+           let! pessoa = inbox.Receive()
+           try 
+            insert pessoa
+           with _ -> inbox.Post pessoa 
+           do! loop() 
+        }
+        loop()
+    )
+    agent.Post
+
 let fetch (conn:NpgsqlConnection) id =
     let sql = """
     SELECT "Id", "Apelido", "Nome", "Nascimento", "Stack" FROM "Pessoas"
