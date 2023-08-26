@@ -44,10 +44,10 @@ let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
         let rec loop() = async {
            let! pessoa = inbox.Receive()
-           do! Console.Out.WriteLineAsync($"%A{pessoa}") |> Async.AwaitTask
            try 
             insert pessoa
-           with _ -> inbox.Post pessoa 
+           with exp ->
+               Console.Out.WriteLine (exp.Message)
            do! loop() 
         }
         loop()
