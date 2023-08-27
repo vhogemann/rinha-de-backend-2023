@@ -1,18 +1,19 @@
 module App.Queue
 
+open Microsoft.FSharp.Control
 open Npgsql
 
 type IPessoaInsertQueue =
     abstract enqueue:Domain.Pessoa -> unit
+    abstract flush:unit -> unit
 
 type Message =
         | Insert of Domain.Pessoa
         | Flush
 
 type PessoaInsertQueue (db:NpgsqlConnection ) =
-    
     let agent = MailboxProcessor<Message>.Start( fun inbox ->
-        let rec loop(queue) = async {
+        let rec loop queue = async {
             let! message = inbox.Receive()
             match message with
             | Insert pessoa ->
@@ -31,4 +32,8 @@ type PessoaInsertQueue (db:NpgsqlConnection ) =
     
     interface IPessoaInsertQueue with
         member _.enqueue(pessoa:Domain.Pessoa) =
-            Insert pessoa |> agent.Post 
+            Insert pessoa |> agent.Post
+            
+        member _.flush() =
+            agent.Post Flush
+            

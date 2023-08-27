@@ -18,7 +18,7 @@ let main args =
     let createPessoa =
         Services.inject<NpgsqlConnection, Queue.IPessoaInsertQueue, Cache.IPessoaCache> Controller.CreatePessoaHandler
     let getPessoa =
-        Services.inject<NpgsqlConnection> Controller.GetPessoaHandler
+        Services.inject<NpgsqlConnection, Cache.IPessoaCache> Controller.GetPessoaHandler
     let searchPessoas =
         Services.inject<NpgsqlConnection> Controller.SearchPessoasHandler
     let countPessoas =
