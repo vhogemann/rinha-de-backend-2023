@@ -16,13 +16,19 @@ type PessoaInsertQueue (db:NpgsqlConnection ) =
             let! message = inbox.Receive()
             match message with
             | Insert pessoa ->
-                let queue = Seq.append queue [pessoa]
-                return! loop(List.Empty)
+                let queue = List.append queue [pessoa]
+                if queue |> Seq.length >= 200 then
+                    do! Domain.insertBatch db queue
+                    return! loop(List.Empty)
+                else
+                    return! loop(queue)
             | Flush ->
-                return! loop(queue)
+                do! Domain.insertBatch db queue
+                return! loop(List.Empty)
         }
         loop(List.Empty)
     )
+    
     interface IPessoaInsertQueue with
         member _.enqueue(pessoa:Domain.Pessoa) =
             Insert pessoa |> agent.Post 
