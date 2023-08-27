@@ -7,6 +7,7 @@ services:
     hostname: api1
     depends_on:
       - postgres
+      - redis
     expose:
       - "80"
     links:
@@ -14,8 +15,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: '0.5GB'
+          cpus: '0.20'
+          memory: '0.4GB'
 
   api2:
     # API - Instância 01
@@ -24,6 +25,7 @@ services:
     hostname: api2
     depends_on:
       - postgres
+      - redis
     expose:
       - "80"
     links:
@@ -31,9 +33,21 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.20'
+          memory: '0.4GB'
+  redis:
+    # Cache
+    image: redis/redis-stack
+    restart: always
+    expose:
+      - "6379"
+    ports:
+      - 9997:6379
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
           memory: '0.5GB'
-
   nginx:
     # Load Balancer
     image: nginx:latest
@@ -48,7 +62,7 @@ services:
       resources:
         limits:
           cpus: '0.15'
-          memory: '0.5GB'
+          memory: '0.4GB'
 
   postgres:
     # Banco de dados
@@ -73,5 +87,5 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.85'
-          memory: '1.5GB'
+          cpus: '0.80'
+          memory: '1.4GB'
