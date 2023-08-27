@@ -41,13 +41,18 @@ let CreatePessoaHandler db queue cache :HttpHandler = Request.bodyString (Create
 
 module GetPessoa =
     let getId = Request.mapRoute (fun r -> r.GetGuid "id")
-                
-    let getPessoa db id =
-        match Domain.fetch db id with
+    let getPessoa (cache:Cache.IPessoaCache) db id =
+        match cache.Get id with
+        | Some person -> Some person
+        | None -> Domain.fetch db id
+    
+    let mapResponse =
+        function
         | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa)
         | None -> (Response.withStatusCode 404 >> Response.ofEmpty)
     
-let GetPessoaHandler db : HttpHandler = GetPessoa.getId (GetPessoa.getPessoa db)
+let GetPessoaHandler db cache : HttpHandler =
+    GetPessoa.getId (GetPessoa.getPessoa cache db >> GetPessoa.mapResponse)
     
 let SearchPessoasHandler db : HttpHandler =
     fun ctx ->
