@@ -27,10 +27,10 @@ let main args =
             services
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
                 .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()    
-                .AddSingleton<IConnectionMultiplexer, ConnectionMultiplexer>(fun _ ->
-                    let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
-                    Cache.createPersonIndex redis
-                    redis)
+                // .AddSingleton<IConnectionMultiplexer, ConnectionMultiplexer>(fun _ ->
+                //     let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
+                //     Cache.createPersonIndex redis
+                //     redis)
         )
 
         endpoints [
