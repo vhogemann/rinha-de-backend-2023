@@ -32,7 +32,6 @@ let JsonOptions =
     options
 
 let insert (conn:NpgsqlConnection) person =
-    Console.Out.WriteLine $"%A{person}"
     let sql = """
         INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack)
     """
@@ -49,6 +48,26 @@ let insert (conn:NpgsqlConnection) person =
     |> Db.setParams param
     |> Db.Async.exec
     |> Async.AwaitTask
+
+let insertBatch (conn:NpgsqlConnection) pessoas =
+    let sql = """ INSERT INTO "Pessoas" """
+    
+    let param =
+        seq {
+            for pessoa in pessoas do
+                yield [
+                    "Id", sqlGuid pessoa.Id
+                    "Apelido", sqlString pessoa.Apelido
+                    "Nome", sqlString pessoa.Nome
+                    "Nascimento", sqlDateTime (pessoa.Nascimento)
+                    "Stack", sqlString (pessoa.Stack |> JsonSerializer.Serialize)
+                ]
+        }
+        |> List.ofSeq
+    conn
+    |> Db.newCommand sql
+    |> Db.Async.execMany param
+    |> Async.AwaitTask    
 
 let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->

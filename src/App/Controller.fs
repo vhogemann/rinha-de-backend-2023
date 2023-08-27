@@ -19,11 +19,10 @@ module CreatePessoa =
         else
             Ok pessoa
     
-    let handler db (queue:Queue.IPessoaInsertQueue) =
+    let handler db (queue:Queue.IPessoaInsertQueue) (cache:Cache.IPessoaCache) =
         let enqueue pessoa =
             queue.enqueue pessoa
             pessoa
-            
         fun pessoa ->
             pessoa
             |> deserialize
@@ -34,14 +33,15 @@ module CreatePessoa =
                 | Error (status, message) ->
                     (Response.withStatusCode status >> Response.ofPlainText message)
                 | Ok pessoa ->
+                    cache.Add pessoa
                     (Response.withStatusCode 201
                      >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
                      >> Response.ofEmpty)
-let CreatePessoaHandler exists insert :HttpHandler = Request.bodyString (CreatePessoa.handler exists insert)
+let CreatePessoaHandler db queue cache :HttpHandler = Request.bodyString (CreatePessoa.handler db queue cache)
 
 module GetPessoa =
     let getId = Request.mapRoute (fun r -> r.GetGuid "id")
-        
+                
     let getPessoa db id =
         match Domain.fetch db id with
         | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa)

@@ -1,5 +1,6 @@
 module App.Cache
 
+open System
 open System.Text.Json
 open NRedisStack.Search
 open NRedisStack.Search.Literals.Enums
@@ -42,7 +43,7 @@ let createPersonIndex (redis:ConnectionMultiplexer) =
                   .AddTagField(FieldName("$.id","id" ))
                   .AddTagField(FieldName("$.apelido","apelido"))
                   .AddTagField(FieldName("$.nome","nome"))
-                  .AddTagField(FieldName("$.stack","stack[*]"))
+                  .AddTagField(FieldName("$.stack[*]","stack"))
               ) |> ignore
 
 let addPerson (redis:ConnectionMultiplexer) (value:Domain.Pessoa) =
@@ -53,6 +54,18 @@ let addPerson (redis:ConnectionMultiplexer) (value:Domain.Pessoa) =
 let searchPerson (redis:ConnectionMultiplexer) query =
     let db = redis.GetDatabase()
     let ft = db.FT()
-    let result = ft.Search("PessoaIndex", Query($"@apelido:{{{query}}}").Limit(0, 50))
+    let result = ft.Search("PessoaIndex", Query(query).Limit(0, 50))
     result.ToJson()
     |> Seq.map JsonSerializer.Deserialize<Domain.Pessoa>
+    
+type IPessoaCache =
+    abstract Add : Domain.Pessoa -> unit
+    abstract Get : Guid -> Domain.Pessoa option
+    abstract GetByApelido : string -> Domain.Pessoa option
+    
+    
+type PessoaCache(redis:ConnectionMultiplexer) =
+    interface IPessoaCache with
+        member this.Add (value:Domain.Pessoa) = addPerson redis value
+        member this.Get(id:Guid) = get redis $"pessoa:{id}"
+        member this.GetByApelido(apelido:string) = searchPerson redis $"@apelido:{{{apelido}}}" |> Seq.tryHead

@@ -3,7 +3,6 @@ module App.Program
 open Falco
 open Falco.Routing
 open Falco.HostBuilder
-open App.Controller
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Npgsql
@@ -16,10 +15,14 @@ let main args =
         ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
-    let createPessoa = Services.inject<NpgsqlConnection, Queue.IPessoaInsertQueue> CreatePessoaHandler
-    let getPessoa = Services.inject<NpgsqlConnection> GetPessoaHandler
-    let searchPessoas = Services.inject<NpgsqlConnection> SearchPessoasHandler
-    let countPessoas = Services.inject<NpgsqlConnection> CountPessoasHandler
+    let createPessoa =
+        Services.inject<NpgsqlConnection, Queue.IPessoaInsertQueue, Cache.IPessoaCache> Controller.CreatePessoaHandler
+    let getPessoa =
+        Services.inject<NpgsqlConnection> Controller.GetPessoaHandler
+    let searchPessoas =
+        Services.inject<NpgsqlConnection> Controller.SearchPessoasHandler
+    let countPessoas =
+        Services.inject<NpgsqlConnection> Controller.CountPessoasHandler
     
     webHost args {
         
@@ -27,10 +30,12 @@ let main args =
             services
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
                 .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()    
-                // .AddSingleton<IConnectionMultiplexer, ConnectionMultiplexer>(fun _ ->
-                //     let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
-                //     Cache.createPersonIndex redis
-                //     redis)
+                .AddSingleton<IConnectionMultiplexer, ConnectionMultiplexer>(fun _ ->
+                    let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
+                    Cache.createPersonIndex redis
+                    redis
+                )
+                .AddSingleton<Cache.IPessoaCache, Cache.PessoaCache>()
         )
 
         endpoints [
