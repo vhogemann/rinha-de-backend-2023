@@ -3,6 +3,7 @@
 open System
 open System.Data
 open System.Text.Json
+open System.Text.Json.Serialization
 open Donald
 open Npgsql
 
@@ -22,6 +23,13 @@ module Pessoa =
             Nascimento = rd.ReadDateTime "Nascimento" 
             Stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
         }
+
+let JsonOptions =
+    let options = JsonSerializerOptions()
+    options.Converters.Add(JsonFSharpConverter())
+    options.AllowTrailingCommas <- true
+    options.PropertyNameCaseInsensitive <- true
+    options
 
 let insert (conn:NpgsqlConnection) person =
     Console.Out.WriteLine $"%A{person}"

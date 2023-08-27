@@ -7,13 +7,10 @@ open System.Text.Json
 
 module CreatePessoa =
     let deserialize:string->Result<ViewModel.CreatePessoa, int*string> =
-        let options = JsonSerializerOptions()
-        options.Converters.Add(JsonFSharpConverter())
-        options.AllowTrailingCommas <- true
-        options.PropertyNameCaseInsensitive <- true
+        
         fun json ->
             try 
-                JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, options)|> Ok
+                JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, Domain.JsonOptions)|> Ok
             with exp ->
                 Error (400, exp.Message)
     let exists db (pessoa:ViewModel.CreatePessoa) =
@@ -22,23 +19,17 @@ module CreatePessoa =
         else
             Ok pessoa
     
-    let insert queue pessoa =
-        try
-            queue pessoa
-            Ok pessoa            
-        with exp ->
-            Error (500, exp.Message)
-            
-    let handler db =
-        let queue =
-            Domain.queueInsert (Domain.insert db)
+    let handler db (queue:Queue.IPessoaInsertQueue) =
+        let enqueue pessoa =
+            queue.enqueue pessoa
+            pessoa
             
         fun pessoa ->
             pessoa
             |> deserialize
             |> Result.bind (exists db)
             |> Result.bind (ViewModel.asPessoa)
-            |> Result.bind (insert queue)
+            |> Result.map enqueue
             |> function
                 | Error (status, message) ->
                     (Response.withStatusCode status >> Response.ofPlainText message)
@@ -46,7 +37,7 @@ module CreatePessoa =
                     (Response.withStatusCode 201
                      >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
                      >> Response.ofEmpty)
-let CreatePessoaHandler db :HttpHandler = Request.bodyString (CreatePessoa.handler db)
+let CreatePessoaHandler exists insert :HttpHandler = Request.bodyString (CreatePessoa.handler exists insert)
 
 module GetPessoa =
     let getId = Request.mapRoute (fun r -> r.GetGuid "id")

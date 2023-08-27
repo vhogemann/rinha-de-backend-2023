@@ -8,11 +8,7 @@ open NUnit.Framework
 open Swensen.Unquote
 
 let options =
-    let options = JsonSerializerOptions()
-    options.Converters.Add(JsonFSharpConverter())
-    options.AllowTrailingCommas <- true
-    options.PropertyNameCaseInsensitive <- true
-    options
+    Domain.JsonOptions
 
 [<SetUp>]
 let Setup () =
