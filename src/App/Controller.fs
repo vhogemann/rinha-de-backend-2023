@@ -14,7 +14,7 @@ module CreatePessoa =
             with exp ->
                 Error (400, exp.Message)
     let exists db (pessoa:ViewModel.CreatePessoa) =
-        if Domain.apelidoExists db pessoa.Apelido then
+        if Domain.apelidoExists db pessoa.apelido then
             Error (422, "Apelido existe")
         else
             Ok pessoa
