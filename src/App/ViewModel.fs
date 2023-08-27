@@ -4,10 +4,10 @@ open App.Domain
 open System
 
 type CreatePessoa = {
-    Apelido: string option
-    Nome: string option
-    Nascimento: string option
-    Stack: String[] option
+    apelido: string option
+    nome: string option
+    nascimento: string option
+    stack: String[] option
 }
 
 let validateString len (aString:string): bool =
@@ -23,7 +23,7 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
             arr |> (Array.map(validateString 32) >> Array.reduce(fun acc x -> acc && x)))
         >> Option.defaultValue true
     let nascimento =
-        pessoa.Nascimento
+        pessoa.nascimento
         |> Option.bind( fun nascimento ->
             match DateOnly.TryParse(nascimento) with
             | true, value -> Some (value.ToDateTime(TimeOnly.MinValue).ToUniversalTime())
@@ -31,7 +31,7 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
                 System.Console.WriteLine("Data invalida")
                 None)
     
-    match pessoa.Nome, pessoa.Apelido, pessoa.Stack, nascimento with
+    match pessoa.nome, pessoa.apelido, pessoa.stack, nascimento with
     | Some nome, Some apelido, stack, Some nascimento
         when validNome nome && validApelido apelido && validStack stack ->
         let result:Pessoa = {
