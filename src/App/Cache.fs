@@ -28,17 +28,17 @@ let createPersonIndex (redis:IConnectionMultiplexer) =
     let db = redis.GetDatabase()
     let ft = db.FT()
     ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
-              Schema()
-                  .AddTagField(FieldName("$.id","id" ))
-                  .AddTagField(FieldName("$.apelido","apelido"))
-                  .AddTagField(FieldName("$.nome","nome"))
-                  .AddTagField(FieldName("$.stack[*]","stack"))
-              ) |> ignore
+            Schema()
+                .AddTagField(FieldName("$.id","id" ))
+                .AddTagField(FieldName("$.apelido","apelido"))
+                .AddTagField(FieldName("$.nome","nome"))
+                .AddTagField(FieldName("$.stack[*]","stack"))
+    ) |> ignore
 
 let addPerson (redis:IConnectionMultiplexer) (value:Domain.Pessoa) =
     let db = redis.GetDatabase()
     let json = db.JSON()
-    json.Set($"pessoa:{value.Id}", "$", value) |> ignore
+    json.Set($"pessoa:{value.id}", "$", value) |> ignore
     
 let searchPerson (redis:IConnectionMultiplexer) query =
     let db = redis.GetDatabase()

@@ -61,8 +61,20 @@ module GetPessoa =
     
 let GetPessoaHandler db cache : HttpHandler =
     GetPessoa.getId (GetPessoa.getPessoa cache db >> GetPessoa.mapResponse)
-    
-let SearchPessoasHandler db : HttpHandler =
+
+module SearchPessoas =
+    let searchCache (cache:Cache.IPessoaCache) term =
+        cache.Search term |> List.ofSeq
+
+    let searchDb (db:Npgsql.NpgsqlConnection) term =
+        Domain.search db term
+
+    let search cache db term =
+        match searchCache cache term with
+        | [] -> searchDb db term
+        | result -> result
+
+let SearchPessoasHandler db cache : HttpHandler =
     fun ctx ->
         let r = Request.getQuery ctx
         let query = r.GetString "t"
@@ -71,7 +83,7 @@ let SearchPessoasHandler db : HttpHandler =
         | "" -> (Response.withStatusCode 400 >> Response.ofEmpty) ctx
         | query ->
         let pessoas =
-            Domain.search db query
+            SearchPessoas.search cache db query
         (Response.withStatusCode 200 >> Response.ofJson pessoas) ctx
     
 let CountPessoasHandler db : HttpHandler = fun ctx ->
