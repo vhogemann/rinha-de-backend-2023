@@ -50,7 +50,7 @@ let insert (conn:NpgsqlConnection) person =
     |> Async.AwaitTask
 
 let insertBatch (conn:NpgsqlConnection) pessoas =
-    let sql = """ INSERT INTO "Pessoas" """
+    let sql = """ INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack) """
     
     let param =
         seq {

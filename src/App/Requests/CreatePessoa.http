@@ -1,4 +1,4 @@
-﻿# curl -v -XPOST -H "content-type: application/json" -d '{"apelido" : "xpto", "nome" : "xpto xpto", "nascimento" : "2000-01-01", "stack": null}' "http://localhost:9999/pessoas"
+﻿# @name createPessoa
 POST http://localhost:9999/pessoas
 Content-Type: application/json
 
@@ -11,3 +11,12 @@ Content-Type: application/json
 
 ###
 
+@location = {{createPessoa.response.headers.Location}}
+
+# @name getPessoa
+
+GET http://localhost:9999{{location}}
+
+# @name contagemPessoas
+
+GET http://localhost:9999/contagem-pessoas

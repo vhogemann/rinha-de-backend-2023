@@ -12,23 +12,31 @@ type Message =
         | Flush
 
 type PessoaInsertQueue (db:NpgsqlConnection ) =
-    let agent = MailboxProcessor<Message>.Start( fun inbox ->
-        let rec loop queue = async {
-            let! message = inbox.Receive()
-            match message with
-            | Insert pessoa ->
-                let queue = List.append queue [pessoa]
-                if queue |> Seq.length >= 200 then
-                    do! Domain.insertBatch db queue
+    let agent = 
+        MailboxProcessor<Message>.Start( fun inbox ->
+            let rec loop batch = async {
+                let! message = inbox.Receive()
+                match message with
+                | Insert pessoa ->
+                    let batch = List.append batch [pessoa]
+                    if batch |> Seq.length >= 200 then
+                        do! Domain.insertBatch db batch
+                        return! loop(List.Empty)
+                    else
+                        return! loop(batch)
+                | Flush ->
+                    do! Domain.insertBatch db batch
                     return! loop(List.Empty)
-                else
-                    return! loop(queue)
-            | Flush ->
-                do! Domain.insertBatch db queue
-                return! loop(List.Empty)
-        }
-        loop(List.Empty)
-    )
+            }
+            loop(List.Empty)
+        )
+
+    let _ = 
+        async {
+            while true do
+                do! Async.Sleep 1000
+                agent.Post Flush
+        } |> Async.Start
     
     interface IPessoaInsertQueue with
         member _.enqueue(pessoa:Domain.Pessoa) =

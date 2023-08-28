@@ -12,11 +12,15 @@ module CreatePessoa =
                 JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, Domain.JsonOptions)|> Ok
             with exp ->
                 Error (400, exp.Message)
-    let exists db (cache:Cache.IPessoaCache) (pessoa:Domain.Pessoa) =
+
+    let existsOnCache (cache:Cache.IPessoaCache) (pessoa:Domain.Pessoa)=
         match cache.GetByApelido (pessoa.Apelido) with
         | Some _ ->
             Error (422, "Apelido existe")
         | None ->
+            Ok pessoa
+        
+    let existsOnDb db (pessoa:Domain.Pessoa) =
         if Domain.apelidoExists db (pessoa.Apelido) then
             Error (422, "Apelido existe")
         else
@@ -30,7 +34,8 @@ module CreatePessoa =
             pessoa
             |> deserialize
             |> Result.bind (ViewModel.asPessoa)
-            |> Result.bind (exists db cache)
+            |> Result.bind (existsOnCache cache)
+            |> Result.bind (existsOnDb db)
             |> Result.map enqueue
             |> function
                 | Error (status, message) ->
