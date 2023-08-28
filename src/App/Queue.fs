@@ -25,8 +25,11 @@ type PessoaInsertQueue (db:NpgsqlConnection ) =
                     else
                         return! loop(batch)
                 | Flush ->
-                    do! Domain.insertBatch db batch
-                    return! loop(List.Empty)
+                    if not (List.isEmpty batch) then
+                        do! Domain.insertBatch db batch
+                        return! loop(List.Empty)
+                    else
+                        return! loop(batch)
             }
             loop(List.Empty)
         )
