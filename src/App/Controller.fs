@@ -7,14 +7,17 @@ open System.Text.Json
 
 module CreatePessoa =
     let deserialize:string->Result<ViewModel.CreatePessoa, int*string> =
-        
         fun json ->
             try 
                 JsonSerializer.Deserialize<ViewModel.CreatePessoa>(json, Domain.JsonOptions)|> Ok
             with exp ->
                 Error (400, exp.Message)
-    let exists db (pessoa:ViewModel.CreatePessoa) =
-        if Domain.apelidoExists db pessoa.apelido then
+    let exists db (cache:Cache.IPessoaCache) (pessoa:Domain.Pessoa) =
+        match cache.GetByApelido (pessoa.Apelido) with
+        | Some _ ->
+            Error (422, "Apelido existe")
+        | None ->
+        if Domain.apelidoExists db (pessoa.Apelido) then
             Error (422, "Apelido existe")
         else
             Ok pessoa
@@ -26,8 +29,8 @@ module CreatePessoa =
         fun pessoa ->
             pessoa
             |> deserialize
-            |> Result.bind (exists db)
             |> Result.bind (ViewModel.asPessoa)
+            |> Result.bind (exists db cache)
             |> Result.map enqueue
             |> function
                 | Error (status, message) ->

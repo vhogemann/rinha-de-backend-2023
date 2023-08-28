@@ -46,5 +46,6 @@
     </Content>
     <Content Include="Requests\CountPessoas.http" />
     <Content Include="Requests\CreatePessoa.http" />
+    <Content Include="Requests\GetPessoa.http" />
   </ItemGroup>
 </Project>

@@ -7,35 +7,24 @@ open NRedisStack.Search.Literals.Enums
 open StackExchange.Redis
 open NRedisStack.RedisStackCommands
 
-let memoize (redis:ConnectionMultiplexer) f =
-    fun c ->
-        let cache = redis.GetDatabase()
-        let value = cache.StringGet $"%A{c}"
-        if value.HasValue then
-            value |> JsonSerializer.Deserialize<'T>
-        else
-            let value = f c 
-            cache.StringSet($"%A{c}", value |> JsonSerializer.Serialize ) |> ignore
-            value
-
-let add (redis:ConnectionMultiplexer) (key:string) value =
-    let db = redis.GetDatabase()
-    db.StringSet(key, value |> JsonSerializer.Serialize ) |> ignore
-
-let get (redis:ConnectionMultiplexer) (key:string) =
-    let db = redis.GetDatabase()
-    let value = db.StringGet(key)
-    if value.HasValue then
-        value |> JsonSerializer.Deserialize<'T> |> Some
-    else
-        None
-    
-let addJson (redis:ConnectionMultiplexer) (key:string) value =
+let addJson (redis:IConnectionMultiplexer) (key:string) value =
     let db = redis.GetDatabase()
     let json = db.JSON()
-    json.Set(key, "$", value |> JsonSerializer.Serialize ) |> ignore
+    json.Set(key, "$", value ) |> ignore
 
-let createPersonIndex (redis:ConnectionMultiplexer) =
+let getJson (redis:IConnectionMultiplexer) (key:string) : 'T option=
+    let db = redis.GetDatabase()
+
+    if db.KeyExists key |> not then
+        None
+    else
+
+    let json = db.JSON()
+    match json.Get<'T> (key,"$") |> box with
+    | null -> None
+    | value -> Some (unbox value)
+
+let createPersonIndex (redis:IConnectionMultiplexer) =
     let db = redis.GetDatabase()
     let ft = db.FT()
     ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
@@ -46,12 +35,12 @@ let createPersonIndex (redis:ConnectionMultiplexer) =
                   .AddTagField(FieldName("$.stack[*]","stack"))
               ) |> ignore
 
-let addPerson (redis:ConnectionMultiplexer) (value:Domain.Pessoa) =
+let addPerson (redis:IConnectionMultiplexer) (value:Domain.Pessoa) =
     let db = redis.GetDatabase()
     let json = db.JSON()
     json.Set($"pessoa:{value.Id}", "$", value) |> ignore
     
-let searchPerson (redis:ConnectionMultiplexer) query =
+let searchPerson (redis:IConnectionMultiplexer) query =
     let db = redis.GetDatabase()
     let ft = db.FT()
     let result = ft.Search("PessoaIndex", Query(query).Limit(0, 50))
@@ -63,9 +52,8 @@ type IPessoaCache =
     abstract Get : Guid -> Domain.Pessoa option
     abstract GetByApelido : string -> Domain.Pessoa option
     
-    
-type PessoaCache(redis:ConnectionMultiplexer) =
+type PessoaCache(redis:IConnectionMultiplexer) =
     interface IPessoaCache with
         member this.Add (value:Domain.Pessoa) = addPerson redis value
-        member this.Get(id:Guid) = get redis $"pessoa:{id}"
+        member this.Get(id:Guid):Domain.Pessoa option = getJson redis $"pessoa:{id}"
         member this.GetByApelido(apelido:string) = searchPerson redis $"@apelido:{{{apelido}}}" |> Seq.tryHead
