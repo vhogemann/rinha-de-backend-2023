@@ -8,20 +8,20 @@ open Donald
 open Npgsql
 
 type Pessoa = {
-    Id: Guid
-    Apelido: string
-    Nome: string
-    Nascimento: DateTime
-    Stack: String[]
+    id: Guid
+    apelido: string
+    nome: string
+    nascimento: DateTime
+    stack: String[]
 }
 module Pessoa =
     let ofDataReader (rd:IDataReader): Pessoa =
         {
-            Id = rd.ReadGuid "Id"
-            Apelido = rd.ReadString "Apelido"
-            Nome = rd.ReadString "Nome"
-            Nascimento = rd.ReadDateTime "Nascimento" 
-            Stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
+            id = rd.ReadGuid "Id"
+            apelido = rd.ReadString "Apelido"
+            nome = rd.ReadString "Nome"
+            nascimento = rd.ReadDateTime "Nascimento" 
+            stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
         }
 
 let JsonOptions =
@@ -35,12 +35,13 @@ let insert (conn:NpgsqlConnection) person =
     let sql = """
         INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack)
     """
+
     let param = [
-        "Id", sqlGuid person.Id
-        "Apelido", sqlString person.Apelido
-        "Nome", sqlString person.Nome
-        "Nascimento", sqlDateTime (person.Nascimento)
-        "Stack", sqlString (person.Stack |> JsonSerializer.Serialize)
+        "Id", sqlGuid person.id
+        "Apelido", sqlString person.apelido
+        "Nome", sqlString person.nome
+        "Nascimento", sqlDateTime (person.nascimento)
+        "Stack", sqlString (person.stack |> JsonSerializer.Serialize)
     ]
     
     conn
@@ -56,11 +57,11 @@ let insertBatch (conn:NpgsqlConnection) pessoas =
         seq {
             for pessoa in pessoas do
                 yield [
-                    "Id", sqlGuid pessoa.Id
-                    "Apelido", sqlString pessoa.Apelido
-                    "Nome", sqlString pessoa.Nome
-                    "Nascimento", sqlDateTime (pessoa.Nascimento)
-                    "Stack", sqlString (pessoa.Stack |> JsonSerializer.Serialize)
+                    "Id", sqlGuid pessoa.id
+                    "Apelido", sqlString pessoa.apelido
+                    "Nome", sqlString pessoa.nome
+                    "Nascimento", sqlDateTime (pessoa.nascimento)
+                    "Stack", sqlString (pessoa.stack |> JsonSerializer.Serialize)
                 ]
         }
         |> List.ofSeq
@@ -135,3 +136,4 @@ let count (conn:NpgsqlConnection) =
     conn
     |> Db.newCommand sql
     |> Db.scalar unbox<Int64> 
+    

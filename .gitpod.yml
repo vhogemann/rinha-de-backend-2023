@@ -2,3 +2,4 @@ image: gitpod/workspace-dotnet
 vscode:
     extensions:
         - Ionide.Ionide-fsharp
+        - humao.rest-client

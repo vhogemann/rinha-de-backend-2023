@@ -14,14 +14,14 @@ module CreatePessoa =
                 Error (400, exp.Message)
 
     let existsOnCache (cache:Cache.IPessoaCache) (pessoa:Domain.Pessoa)=
-        match cache.GetByApelido (pessoa.Apelido) with
+        match cache.GetByApelido (pessoa.apelido) with
         | Some _ ->
             Error (422, "Apelido existe")
         | None ->
             Ok pessoa
         
     let existsOnDb db (pessoa:Domain.Pessoa) =
-        if Domain.apelidoExists db (pessoa.Apelido) then
+        if Domain.apelidoExists db (pessoa.apelido) then
             Error (422, "Apelido existe")
         else
             Ok pessoa
@@ -43,7 +43,7 @@ module CreatePessoa =
                 | Ok pessoa ->
                     cache.Add pessoa
                     (Response.withStatusCode 201
-                     >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.Id}") ]
+                     >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.id}") ]
                      >> Response.ofEmpty)
 let CreatePessoaHandler db queue cache :HttpHandler = Request.bodyString (CreatePessoa.handler db queue cache)
 

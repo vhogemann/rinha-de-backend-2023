@@ -43,7 +43,7 @@ let addPerson (redis:IConnectionMultiplexer) (value:Domain.Pessoa) =
 let searchPerson (redis:IConnectionMultiplexer) query =
     let db = redis.GetDatabase()
     let ft = db.FT()
-    let result = ft.Search("PessoaIndex", Query(query).Limit(0, 50))
+    let result = ft.Search("PessoaIndex", Query(query).Dialect(3).Limit(0, 50))
     result.ToJson()
     |> Seq.map JsonSerializer.Deserialize<Domain.Pessoa>
     
@@ -51,9 +51,15 @@ type IPessoaCache =
     abstract Add : Domain.Pessoa -> unit
     abstract Get : Guid -> Domain.Pessoa option
     abstract GetByApelido : string -> Domain.Pessoa option
+    abstract Search : string -> Domain.Pessoa seq
     
 type PessoaCache(redis:IConnectionMultiplexer) =
     interface IPessoaCache with
-        member this.Add (value:Domain.Pessoa) = addPerson redis value
-        member this.Get(id:Guid):Domain.Pessoa option = getJson redis $"pessoa:{id}"
-        member this.GetByApelido(apelido:string) = searchPerson redis $"@apelido:{{{apelido}}}" |> Seq.tryHead
+        member this.Add (value:Domain.Pessoa) = 
+            addPerson redis value
+        member this.Get(id:Guid):Domain.Pessoa option = 
+            getJson redis $"pessoa:{id}"
+        member this.GetByApelido(apelido:string) = 
+            searchPerson redis $"@apelido:({apelido})" |> Seq.tryHead
+        member this.Search(term:string) = 
+            searchPerson redis term

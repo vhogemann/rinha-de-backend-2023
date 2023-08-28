@@ -35,11 +35,11 @@ let asPessoa (pessoa:CreatePessoa): Result<Pessoa, int*string> =
     | Some nome, Some apelido, stack, Some nascimento
         when validNome nome && validApelido apelido && validStack stack ->
         let result:Pessoa = {
-            Id = Guid.NewGuid()
-            Apelido = apelido
-            Nome = nome
-            Nascimento = nascimento
-            Stack = (stack |> Option.defaultValue [||])
+            id = Guid.NewGuid()
+            apelido = apelido
+            nome = nome
+            nascimento = nascimento
+            stack = (stack |> Option.defaultValue [||])
         }
         Ok result
     | _ ->
