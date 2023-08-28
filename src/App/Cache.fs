@@ -29,10 +29,9 @@ let createPersonIndex (redis:IConnectionMultiplexer) =
     let ft = db.FT()
     ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
             Schema()
-                .AddTagField(FieldName("$.id","id" ))
-                .AddTagField(FieldName("$.apelido","apelido"))
-                .AddTagField(FieldName("$.nome","nome"))
-                .AddTagField(FieldName("$.stack[*]","stack"))
+                .AddTextField(FieldName("$.apelido","apelido"))
+                .AddTextField(FieldName("$.nome","nome"))
+                .AddTextField(FieldName("$.stack","stack"))
     ) |> ignore
 
 let addPerson (redis:IConnectionMultiplexer) (value:Domain.Pessoa) =
@@ -62,4 +61,4 @@ type PessoaCache(redis:IConnectionMultiplexer) =
         member this.GetByApelido(apelido:string) = 
             searchPerson redis $"@apelido:({apelido})" |> Seq.tryHead
         member this.Search(term:string) = 
-            searchPerson redis term
+            searchPerson redis $"%%{term}%%"

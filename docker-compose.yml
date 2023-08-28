@@ -37,8 +37,8 @@ services:
           memory: '0.4GB'
   redis:
     # Cache
-    image: redis/redis-stack-server
-    restart: always
+    image: redis/redis-stack-server:latest
+    restart: unless-stopped
     expose:
       - "6379"
     ports:
