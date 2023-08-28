@@ -7,11 +7,6 @@ open NRedisStack.Search.Literals.Enums
 open StackExchange.Redis
 open NRedisStack.RedisStackCommands
 
-let addJson (redis:IConnectionMultiplexer) (key:string) value =
-    let db = redis.GetDatabase()
-    let json = db.JSON()
-    json.Set(key, "$", value ) |> ignore
-
 let getJson (redis:IConnectionMultiplexer) (key:string) : 'T option=
     let db = redis.GetDatabase()
 
