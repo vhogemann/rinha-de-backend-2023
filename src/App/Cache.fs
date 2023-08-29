@@ -2,58 +2,95 @@ module App.Cache
 
 open System
 open System.Text.Json
+open System.Threading.Tasks
 open NRedisStack.Search
 open NRedisStack.Search.Literals.Enums
-open StackExchange.Redis
 open NRedisStack.RedisStackCommands
+open StackExchange.Redis.MultiplexerPool
 
-let getJson (redis:IConnectionMultiplexer) (key:string) : 'T option=
-    let db = redis.GetDatabase()
+let getJson (redis:IConnectionMultiplexerPool) (key:string) : Task<'T option> = task {
+    let! pool = redis.GetAsync()
+    let db = pool.Connection.GetDatabase()
 
-    if db.KeyExists key |> not then
-        None
+    let! keyExists = db.KeyExistsAsync key
+    if not keyExists then
+        return None
     else
 
     let json = db.JSON()
-    match json.Get<'T> (key,"$") |> box with
-    | null -> None
-    | value -> Some (unbox value)
-
-let createPersonIndex (redis:IConnectionMultiplexer) =
-    let db = redis.GetDatabase()
-    let ft = db.FT()
-    ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
-            Schema()
-                .AddTextField(FieldName("$.apelido","apelido"))
-                .AddTextField(FieldName("$.nome","nome"))
-                .AddTextField(FieldName("$.stack","stack"))
-    ) |> ignore
-
-let addPerson (redis:IConnectionMultiplexer) (value:Domain.Pessoa) =
-    let db = redis.GetDatabase()
-    let json = db.JSON()
-    json.Set($"pessoa:{value.id}", "$", value) |> ignore
     
-let searchPerson (redis:IConnectionMultiplexer) query =
-    let db = redis.GetDatabase()
+    let! result = json.GetAsync<'T>(key)
+    return 
+        match box result with
+        | null -> None
+        | value -> Some (unbox value)
+}
+
+let createPersonIndex (redis:IConnectionMultiplexerPool) =
+    task {
+        let! pool = redis.GetAsync()
+        let db = pool.Connection.GetDatabase()
+        let ft = db.FT()
+        try
+            ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
+                Schema()
+                    .AddTextField(FieldName("$.apelido","apelido"))
+                    .AddTextField(FieldName("$.nome","nome"))
+                    .AddTextField(FieldName("$.stack","stack"))
+            ) |> ignore
+        with exp ->
+            //TODO real logging
+            Console.Out.WriteLine (exp.Message)
+}
+
+let addPerson (redis:IConnectionMultiplexerPool) (value:Domain.Pessoa) = task {
+    let! pool = redis.GetAsync()
+    let db = pool.Connection.GetDatabase()
+    let json = db.JSON()
+    return! json.SetAsync($"pessoa:{value.id}", "$", value)
+}
+    
+let searchPerson (redis:IConnectionMultiplexerPool) query = task {
+    let! pool = redis.GetAsync()
+    let db = pool.Connection.GetDatabase()
     let ft = db.FT()
-    let result = ft.Search("PessoaIndex", Query(query).Dialect(3).Limit(0, 50))
-    result.ToJson()
-    |> Seq.map JsonSerializer.Deserialize<Domain.Pessoa>
+    let! result = ft.SearchAsync("PessoaIndex", Query(query).Dialect(3).Limit(0, 50))
+    
+    return
+        result.ToJson()
+        |> Seq.map (fun json -> JsonSerializer.Deserialize<Domain.Pessoa[]>(json, Domain.JsonOptions))
+        |> Seq.concat
+}
     
 type IPessoaCache =
-    abstract Add : Domain.Pessoa -> unit
+    abstract Add : Domain.Pessoa -> bool
     abstract Get : Guid -> Domain.Pessoa option
     abstract GetByApelido : string -> Domain.Pessoa option
     abstract Search : string -> Domain.Pessoa seq
+    abstract CreateIndex : unit -> unit
     
-type PessoaCache(redis:IConnectionMultiplexer) =
+type PessoaCache(redis:IConnectionMultiplexerPool) =
     interface IPessoaCache with
         member this.Add (value:Domain.Pessoa) = 
             addPerson redis value
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
         member this.Get(id:Guid):Domain.Pessoa option = 
             getJson redis $"pessoa:{id}"
-        member this.GetByApelido(apelido:string) = 
-            searchPerson redis $"@apelido:({apelido})" |> Seq.tryHead
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
+        member this.GetByApelido(apelido:string) =
+            task {
+                let! result = searchPerson redis $"@apelido:({apelido})"
+                return result |> Seq.tryHead
+            }
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
         member this.Search(term:string) = 
-            searchPerson redis $"%%{term}%%"
+            searchPerson redis ("%" + term + "%")
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
+        member this.CreateIndex() =
+            createPersonIndex redis
+            |> Async.AwaitTask
+            |> Async.RunSynchronously

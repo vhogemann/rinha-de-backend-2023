@@ -6,7 +6,7 @@ open Falco.HostBuilder
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Npgsql
-open StackExchange.Redis
+open StackExchange.Redis.MultiplexerPool
 
 [<EntryPoint>]
 let main args =
@@ -29,13 +29,17 @@ let main args =
         add_service (fun services ->
             services
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
-                .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()    
-                .AddSingleton<IConnectionMultiplexer, ConnectionMultiplexer>(fun _ ->
-                    let redis = ConnectionMultiplexer.Connect(config.GetConnectionString("Redis"))
-                    Cache.createPersonIndex redis
-                    redis
+                .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()
+                .AddSingleton<IConnectionMultiplexerPool>(fun _ ->
+                    ConnectionMultiplexerPoolFactory.Create(
+                        50,
+                        config.GetConnectionString("Redis")))
+                .AddSingleton<Cache.IPessoaCache>( fun ctx ->
+                    let pool = ctx.GetService<IConnectionMultiplexerPool>()
+                    let cache = Cache.PessoaCache(pool) :> Cache.IPessoaCache
+                    cache.CreateIndex()
+                    cache
                 )
-                .AddSingleton<Cache.IPessoaCache, Cache.PessoaCache>()
         )
 
         endpoints [

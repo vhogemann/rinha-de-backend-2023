@@ -39,6 +39,8 @@ services:
     # Cache
     image: redis/redis-stack-server:latest
     restart: unless-stopped
+    environment:
+      REDIS_ARGS: --maxclients 20000
     expose:
       - "6379"
     ports:

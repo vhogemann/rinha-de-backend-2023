@@ -41,7 +41,7 @@ module CreatePessoa =
                 | Error (status, message) ->
                     (Response.withStatusCode status >> Response.ofPlainText message)
                 | Ok pessoa ->
-                    cache.Add pessoa
+                    cache.Add pessoa |> ignore
                     (Response.withStatusCode 201
                      >> Response.withHeaders [ ("Location", $"/pessoas/{pessoa.id}") ]
                      >> Response.ofEmpty)
