@@ -1,0 +1,29 @@
+﻿# @name createPessoa
+POST http://localhost:9999/pessoas
+Content-Type: application/json
+
+{
+  "apelido": "xpto",
+  "nome": "xpto xpto",
+  "nascimento": "2000-01-01",
+  "stack": ["teste"]
+}
+
+@location = {{ createPessoa.response.headers.Location }} 
+
+###
+# @name getPessoa
+
+GET http://localhost:9999/{{location}}
+
+###
+
+# @name contagemPessoas
+
+GET http://localhost:9999/contagem-pessoas
+
+###
+
+# @name buscaPessoas
+
+GET http://localhost:9999/pessoas?t=test
