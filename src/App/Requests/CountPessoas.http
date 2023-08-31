@@ -1,5 +1,0 @@
-﻿# curl -v "http://localhost:9999/contagem-pessoas"
-GET http://localhost:9999/contagem-pessoas
-
-###
-

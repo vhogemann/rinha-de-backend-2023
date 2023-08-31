@@ -4,16 +4,14 @@ open System
 open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
-    open StackExchange.Redis.MultiplexerPool
+open StackExchange.Redis.MultiplexerPool
 
 module PessoaCache =
     open System.Text.Json
-    open System.Threading.Tasks
-    let PESSOA_DB = 0
     
-    let getJson (redis:IConnectionMultiplexerPool) database (key:string) : Task<'T option> = task {
+    let getJson (redis:IConnectionMultiplexerPool) (key:string) : Task<'T option> = task {
         let! pool = redis.GetAsync()
-        let db = pool.Connection.GetDatabase(database)
+        let db = pool.Connection.GetDatabase()
 
         let! keyExists = db.KeyExistsAsync key
         if not keyExists then
@@ -27,7 +25,7 @@ module PessoaCache =
     }
     let addPerson (redis:IConnectionMultiplexerPool) (value:Domain.Pessoa) = task {
         let! pool = redis.GetAsync()
-        let db = pool.Connection.GetDatabase(PESSOA_DB)
+        let db = pool.Connection.GetDatabase()
         let json = JsonSerializer.Serialize(value, Domain.JsonOptions)
         return! db.StringSetAsync($"pessoa:{value.id}", json)
     }
@@ -64,7 +62,7 @@ type PessoaCache(logger:ILogger<PessoaCache>, redis:IConnectionMultiplexerPool) 
     interface IPessoaCache with
         member this.Add (value:Domain.Pessoa) = agent.Post value
         member this.Get(id:Guid):Domain.Pessoa option = 
-            PessoaCache.getJson redis PessoaCache.PESSOA_DB $"pessoa:{id}"
+            PessoaCache.getJson redis $"pessoa:{id}"
             |> Async.AwaitTask
             |> Async.RunSynchronously
 
@@ -82,12 +80,13 @@ type IApelidoCache =
     abstract Add: Domain.Pessoa -> unit
     abstract Test: Domain.Pessoa -> bool
     
-type ApelidoCache(redis:IConnectionMultiplexerPool) =
+type ApelidoCache(logger:ILogger<ApelidoCache>,redis:IConnectionMultiplexerPool) =
     let CHANNEL = "apelido"
     let cache = ConcurrentDictionary<String,bool>()
    
     let subscribeAsync =
         ApelidoCache.subscribe redis CHANNEL (fun message ->
+            logger.LogInformation("Received message - {}", message)
             cache.TryAdd(message, true)|> ignore )
     
     interface IApelidoCache with

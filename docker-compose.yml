@@ -15,7 +15,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.15'
           memory: '0.4GB'
 
   api2:
@@ -33,14 +33,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.15'
           memory: '0.4GB'
   redis:
     # Cache
-    image: redis/redis-stack-server:latest
+    image: redis
+    command: redis-server --save "" --appendonly no --maxclients 20000
     restart: unless-stopped
-    environment:
-      REDIS_ARGS: --maxclients 20000
     expose:
       - "6379"
     ports:
@@ -48,7 +47,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.05'
+          cpus: '0.15'
           memory: '0.3GB'
   nginx:
     # Load Balancer
@@ -63,7 +62,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.15'
+          cpus: '0.1'
           memory: '0.5GB'
 
   postgres:
@@ -86,8 +85,9 @@ services:
       - 9998:5432
     volumes:
       - ./bootstrap.sql:/docker-entrypoint-initdb.d/bootstrap.sql
+      - ./postgresql.conf:/docker-entrypoint-initdb.d/postgresql.conf
     deploy:
       resources:
         limits:
-          cpus: '0.80'
+          cpus: '0.9'
           memory: '1.4GB'
