@@ -3,13 +3,14 @@ POST http://localhost:9999/pessoas
 Content-Type: application/json
 
 {
-  "apelido": "ouelido",
+  "apelido": "xpto",
   "nome": "xpto xpto",
   "nascimento": "2000-01-01",
   "stack": ["teste"]
 }
 
 > {% 
+    client.test( () => client.assert(response.status == 201, "Wrong status code"));
     client.global.set("location", response.headers.valuesOf("Location")[0]);
   %}
 

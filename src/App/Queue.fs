@@ -1,17 +1,28 @@
 module App.Queue
 
+open Microsoft.Extensions.Logging
 open Microsoft.FSharp.Control
 open Npgsql
 
 type IPessoaInsertQueue =
-    abstract enqueue:Domain.Pessoa -> unit
-    abstract flush:unit -> unit
+    abstract Enqueue:Domain.Pessoa -> unit
+    abstract Flush:unit -> unit
 
 type Message =
         | Insert of Domain.Pessoa
         | Flush
 
-type PessoaInsertQueue (db:NpgsqlConnection ) =
+type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection) =
+    let tryInsert batch loop = async {
+        try
+            do! Domain.insertBatch db batch
+            logger.LogInformation("Inserted batch of {0}", batch |> Seq.length)
+            return! loop List.Empty
+        with exp ->
+            logger.LogError(exp, "Error inserting batch of {0}", batch |> Seq.length)
+            return! loop batch
+    }
+        
     let agent = 
         MailboxProcessor<Message>.Start( fun inbox ->
             let rec loop batch = async {
@@ -20,14 +31,12 @@ type PessoaInsertQueue (db:NpgsqlConnection ) =
                 | Insert pessoa ->
                     let batch = List.append batch [pessoa]
                     if batch |> Seq.length >= 200 then
-                        do! Domain.insertBatch db batch
-                        return! loop(List.Empty)
+                        return! tryInsert batch loop
                     else
-                        return! loop(batch)
+                        return! loop batch
                 | Flush ->
                     if not (List.isEmpty batch) then
-                        do! Domain.insertBatch db batch
-                        return! loop(List.Empty)
+                        return! tryInsert batch loop
                     else
                         return! loop(batch)
             }
@@ -42,9 +51,9 @@ type PessoaInsertQueue (db:NpgsqlConnection ) =
         } |> Async.Start
     
     interface IPessoaInsertQueue with
-        member _.enqueue(pessoa:Domain.Pessoa) =
+        member _.Enqueue(pessoa:Domain.Pessoa) =
             Insert pessoa |> agent.Post
             
-        member _.flush() =
+        member _.Flush() =
             agent.Post Flush
             

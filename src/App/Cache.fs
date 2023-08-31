@@ -1,96 +1,104 @@
 module App.Cache
 
 open System
-open System.Text.Json
+open System.Collections.Concurrent
 open System.Threading.Tasks
-open NRedisStack.Search
-open NRedisStack.Search.Literals.Enums
-open NRedisStack.RedisStackCommands
-open StackExchange.Redis.MultiplexerPool
+open Microsoft.Extensions.Logging
+    open StackExchange.Redis.MultiplexerPool
 
-let getJson (redis:IConnectionMultiplexerPool) (key:string) : Task<'T option> = task {
-    let! pool = redis.GetAsync()
-    let db = pool.Connection.GetDatabase()
-
-    let! keyExists = db.KeyExistsAsync key
-    if not keyExists then
-        return None
-    else
-
-    let json = db.JSON()
+module PessoaCache =
+    open System.Text.Json
+    open System.Threading.Tasks
+    let PESSOA_DB = 0
     
-    let! result = json.GetAsync<'T>(key)
-    return 
-        match box result with
-        | null -> None
-        | value -> Some (unbox value)
-}
-
-let createPersonIndex (redis:IConnectionMultiplexerPool) =
-    task {
+    let getJson (redis:IConnectionMultiplexerPool) database (key:string) : Task<'T option> = task {
         let! pool = redis.GetAsync()
-        let db = pool.Connection.GetDatabase()
-        let ft = db.FT()
-        try
-            ft.Create("PessoaIndex", FTCreateParams().On(IndexDataType.JSON).Prefix("pessoa:"),
-                Schema()
-                    .AddTextField(FieldName("$.apelido","apelido"))
-                    .AddTextField(FieldName("$.nome","nome"))
-                    .AddTextField(FieldName("$.stack","stack"))
-            ) |> ignore
-        with exp ->
-            //TODO real logging
-            Console.Out.WriteLine (exp.Message)
-}
+        let db = pool.Connection.GetDatabase(database)
 
-let addPerson (redis:IConnectionMultiplexerPool) (value:Domain.Pessoa) = task {
-    let! pool = redis.GetAsync()
-    let db = pool.Connection.GetDatabase()
-    let json = db.JSON()
-    return! json.SetAsync($"pessoa:{value.id}", "$", value)
-}
-    
-let searchPerson (redis:IConnectionMultiplexerPool) query = task {
-    let! pool = redis.GetAsync()
-    let db = pool.Connection.GetDatabase()
-    let ft = db.FT()
-    let! result = ft.SearchAsync("PessoaIndex", Query(query).Dialect(3).Limit(0, 50))
-    
-    return
-        result.ToJson()
-        |> Seq.map (fun json -> JsonSerializer.Deserialize<Domain.Pessoa[]>(json, Domain.JsonOptions))
-        |> Seq.concat
-}
-    
+        let! keyExists = db.KeyExistsAsync key
+        if not keyExists then
+            return None
+        else
+        let! result = db.StringGetAsync(key)
+        return 
+            match box result with
+            | null -> None
+            | value -> Some (JsonSerializer.Deserialize<'T>(value.ToString(), Domain.JsonOptions))
+    }
+    let addPerson (redis:IConnectionMultiplexerPool) (value:Domain.Pessoa) = task {
+        let! pool = redis.GetAsync()
+        let db = pool.Connection.GetDatabase(PESSOA_DB)
+        let json = JsonSerializer.Serialize(value, Domain.JsonOptions)
+        return! db.StringSetAsync($"pessoa:{value.id}", json)
+    }
+            
 type IPessoaCache =
-    abstract Add : Domain.Pessoa -> bool
+    abstract Add : Domain.Pessoa -> unit
     abstract Get : Guid -> Domain.Pessoa option
-    abstract GetByApelido : string -> Domain.Pessoa option
-    abstract Search : string -> Domain.Pessoa seq
-    abstract CreateIndex : unit -> unit
     
-type PessoaCache(redis:IConnectionMultiplexerPool) =
+type PessoaCache(logger:ILogger<PessoaCache>, redis:IConnectionMultiplexerPool) =
+    
+    let tryAddPessoa pessoa =  async {
+        let! result = PessoaCache.addPerson redis pessoa |> Async.AwaitTask |> Async.Catch
+        match result with
+        | Choice1Of2 success ->
+            if not success then
+                logger.LogError("Erro ao adicionar pessoa {0}", pessoa.id)
+                return Error "Erro ao adicionar pessoa"
+            else
+                return Ok pessoa
+        | Choice2Of2 exp  ->
+            logger.LogError(exp, "Erro ao adicionar pessoa {0}", pessoa.id)
+            return Error "Erro ao adicionar pessoa"
+    }
+    
+    let agent = MailboxProcessor<Domain.Pessoa>.Start(fun inbox ->
+        let rec loop () = async {
+            let! pessoa = inbox.Receive()
+            let! pessoaAdded = tryAddPessoa pessoa
+            return! loop()
+        }
+        loop ()
+    )
+    
     interface IPessoaCache with
-        member this.Add (value:Domain.Pessoa) = 
-            addPerson redis value
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        member this.Add (value:Domain.Pessoa) = agent.Post value
         member this.Get(id:Guid):Domain.Pessoa option = 
-            getJson redis $"pessoa:{id}"
+            PessoaCache.getJson redis PessoaCache.PESSOA_DB $"pessoa:{id}"
             |> Async.AwaitTask
             |> Async.RunSynchronously
-        member this.GetByApelido(apelido:string) =
+
+
+module ApelidoCache =
+    let subscribe (redis:IConnectionMultiplexerPool) (channel:string) callback = task {
+        let! pool = redis.GetAsync()
+        let sub = pool.Connection.GetSubscriber()
+        let action = fun _ message -> callback (message |> string)
+        let! channel = sub.SubscribeAsync(channel, action)
+        return sub
+    }
+     
+type IApelidoCache =
+    abstract Add: Domain.Pessoa -> unit
+    abstract Test: Domain.Pessoa -> bool
+    
+type ApelidoCache(redis:IConnectionMultiplexerPool) =
+    let CHANNEL = "apelido"
+    let cache = ConcurrentDictionary<String,bool>()
+   
+    let subscribeAsync =
+        ApelidoCache.subscribe redis CHANNEL (fun message ->
+            cache.TryAdd(message, true)|> ignore )
+    
+    interface IApelidoCache with
+        member this.Add pessoa =
             task {
-                let! result = searchPerson redis $"@apelido:({apelido})"
-                return result |> Seq.tryHead
+                let! subscriber = subscribeAsync
+                return! subscriber.PublishAsync (CHANNEL, pessoa.apelido)
             }
             |> Async.AwaitTask
+            |> Async.Ignore
             |> Async.RunSynchronously
-        member this.Search(term:string) = 
-            searchPerson redis ("%" + term + "%")
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
-        member this.CreateIndex() =
-            createPersonIndex redis
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+        member this.Test pessoa = cache.ContainsKey pessoa.apelido
+        
+    

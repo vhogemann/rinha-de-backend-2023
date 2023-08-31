@@ -15,7 +15,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'
+          cpus: '0.25'
           memory: '0.4GB'
 
   api2:
@@ -33,7 +33,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.20'
+          cpus: '0.25'
           memory: '0.4GB'
   redis:
     # Cache
@@ -48,8 +48,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.15'
-          memory: '0.5GB'
+          cpus: '0.05'
+          memory: '0.3GB'
   nginx:
     # Load Balancer
     image: nginx:latest
@@ -64,7 +64,7 @@ services:
       resources:
         limits:
           cpus: '0.15'
-          memory: '0.4GB'
+          memory: '0.5GB'
 
   postgres:
     # Banco de dados

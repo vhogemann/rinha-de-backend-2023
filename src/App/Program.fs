@@ -5,6 +5,7 @@ open Falco.Routing
 open Falco.HostBuilder
 open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Npgsql
 open StackExchange.Redis.MultiplexerPool
 
@@ -16,15 +17,17 @@ let main args =
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
     let createPessoa =
-        Services.inject<NpgsqlConnection, Queue.IPessoaInsertQueue, Cache.IPessoaCache> Controller.CreatePessoaHandler
+        Services.inject<Queue.IPessoaInsertQueue, Cache.IPessoaCache, Cache.IApelidoCache> Controller.CreatePessoaHandler
     let getPessoa =
         Services.inject<NpgsqlConnection, Cache.IPessoaCache> Controller.GetPessoaHandler
     let searchPessoas =
-        Services.inject<NpgsqlConnection, Cache.IPessoaCache> Controller.SearchPessoasHandler
+        Services.inject<NpgsqlConnection> Controller.SearchPessoasHandler
     let countPessoas =
         Services.inject<NpgsqlConnection> Controller.CountPessoasHandler
-    
+        
     webHost args {
+
+        logging (fun builder -> builder.AddConsole())
         
         add_service (fun services ->
             services
@@ -34,14 +37,11 @@ let main args =
                     ConnectionMultiplexerPoolFactory.Create(
                         50,
                         config.GetConnectionString("Redis")))
-                .AddSingleton<Cache.IPessoaCache>( fun ctx ->
-                    let pool = ctx.GetService<IConnectionMultiplexerPool>()
-                    let cache = Cache.PessoaCache(pool) :> Cache.IPessoaCache
-                    cache.CreateIndex()
-                    cache
-                )
+                .AddSingleton<Cache.IPessoaCache, Cache.PessoaCache>()
+                .AddSingleton<Cache.IApelidoCache, Cache.ApelidoCache>()
+                .AddLogging()
         )
-
+       
         endpoints [
             post "/pessoas" createPessoa
             get "/pessoas/{id}" getPessoa
