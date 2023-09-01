@@ -1,5 +1,7 @@
 module App.Queue
 
+open System.Threading.Tasks.Dataflow
+open App.Cache
 open Microsoft.Extensions.Logging
 open Microsoft.FSharp.Control
 open Npgsql
@@ -12,25 +14,26 @@ type Message =
         | Insert of Domain.Pessoa
         | Flush
 
-type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection) =
-    let tryInsert batch loop = async {
+type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection, cache:IApelidoCache) =
+    let tryInsert batch loop = task {
         try
-            do! Domain.insertBatch db batch
+            let! result = Domain.insertBatch logger db batch
+            logger.LogInformation("Inserted batch of {0}", result)
             logger.LogInformation("Inserted batch of {0}", batch |> Seq.length)
             return! loop List.Empty
         with exp ->
             logger.LogError(exp, "Error inserting batch of {0}", batch |> Seq.length)
-            return! loop batch
+            return! loop (batch |> List.filter ( cache.Exists >> not ))
     }
         
     let agent = 
         MailboxProcessor<Message>.Start( fun inbox ->
-            let rec loop batch = async {
+            let rec loop batch = task {
                 let! message = inbox.Receive()
                 match message with
                 | Insert pessoa ->
                     let batch = List.append batch [pessoa]
-                    if batch |> Seq.length >= 200 then
+                    if batch |> Seq.length >= 500 then
                         return! tryInsert batch loop
                     else
                         return! loop batch
@@ -40,13 +43,13 @@ type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection) 
                     else
                         return! loop(batch)
             }
-            loop(List.Empty)
+            loop(List.Empty) |> Async.AwaitTask
         )
 
     let _ = 
         async {
             while true do
-                do! Async.Sleep 1000
+                do! Async.Sleep 2000
                 agent.Post Flush
         } |> Async.Start
     

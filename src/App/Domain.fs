@@ -5,6 +5,7 @@ open System.Data
 open System.Text.Json
 open System.Text.Json.Serialization
 open Donald
+open Microsoft.Extensions.Logging
 open Npgsql
 
 type Pessoa = {
@@ -48,28 +49,13 @@ let insert (conn:NpgsqlConnection) person =
     |> Db.newCommand sql
     |> Db.setParams param
     |> Db.Async.exec
-    |> Async.AwaitTask
 
-let insertBatch (conn:NpgsqlConnection) pessoas =
+let insertBatch (logger:ILogger<'T>) (conn:NpgsqlConnection) pessoas =
     let sql = """ INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack) """
+    use tran = conn.TryBeginTransaction()
     
-    let param =
-        seq {
-            for pessoa in pessoas do
-                yield [
-                    "Id", sqlGuid pessoa.id
-                    "Apelido", sqlString pessoa.apelido
-                    "Nome", sqlString pessoa.nome
-                    "Nascimento", sqlDateTime (pessoa.nascimento)
-                    "Stack", sqlString (pessoa.stack |> JsonSerializer.Serialize)
-                ]
-        }
-        |> List.ofSeq
-    conn
-    |> Db.newCommand sql
-    |> Db.Async.execMany param
-    |> Async.AwaitTask    
-
+    
+    
 let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
         let rec loop() = async {
@@ -95,21 +81,22 @@ let fetch (conn:NpgsqlConnection) id =
     conn
     |> Db.newCommand sql
     |> Db.setParams param
-    |> Db.querySingle Pessoa.ofDataReader
+    |> Db.Async.querySingle Pessoa.ofDataReader
 
-let apelidoExists (conn:NpgsqlConnection) apelido =
+let apelidoExists (conn:NpgsqlConnection) apelido = task {
     let sql = """
         SELECT count(*) FROM "Pessoas" WHERE "Apelido" = @Apelido
     """
     let param = [
         "Apelido", sqlString apelido
     ]
-    let count = 
+    let! count = 
         conn
         |> Db.newCommand sql
         |> Db.setParams param
-        |> Db.scalar unbox<Int64>
-    count > 0L
+        |> Db.Async.scalar unbox<Int64>
+    return count > 0L
+}
     
 let search (conn:NpgsqlConnection) termo =
     let sql = """
@@ -128,12 +115,12 @@ let search (conn:NpgsqlConnection) termo =
     conn
     |> Db.newCommand sql
     |> Db.setParams param
-    |> Db.query Pessoa.ofDataReader
+    |> Db.Async.query Pessoa.ofDataReader
     
 let count (conn:NpgsqlConnection) =
     let sql = "SELECT count(*) From \"Pessoas\""
     
     conn
     |> Db.newCommand sql
-    |> Db.scalar unbox<Int64> 
+    |> Db.Async.scalar unbox<Int64> 
     

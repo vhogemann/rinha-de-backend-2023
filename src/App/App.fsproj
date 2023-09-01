@@ -45,8 +45,9 @@
     <Content Include="..\..\README.md">
       <Link>External Items\README.md</Link>
     </Content>
-    <Content Include="Requests\CountPessoas.http" />
-    <Content Include="Requests\CreatePessoa.http" />
-    <Content Include="Requests\GetPessoa.http" />
+    <Content Include="..\..\postgresql.conf">
+      <Link>External Items\postgresql.conf</Link>
+    </Content>
+    <Content Include="Requests\CreatePessoa-Rider.http" />
   </ItemGroup>
 </Project>
