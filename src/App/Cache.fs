@@ -1,8 +1,9 @@
 module App.Cache
 
 open System
-open System.Collections.Concurrent
+open System.Text.Json
 open System.Threading.Tasks
+open Microsoft.Extensions.Caching.Memory
 open Microsoft.Extensions.Logging
 open StackExchange.Redis.MultiplexerPool
 module PessoaCache =
@@ -17,21 +18,30 @@ module PessoaCache =
 type IPessoaCache =
     abstract Add: Domain.Pessoa -> Task<unit>
     abstract Exists: Domain.Pessoa -> bool
+    abstract Get: Guid -> Domain.Pessoa option
     
-type PessoaCache(logger:ILogger<PessoaCache>,redis:IConnectionMultiplexerPool) =
-    let APELIDO = "apelido"
-    let apelidoCache = ConcurrentDictionary<String,bool>()
+type PessoaCache(logger:ILogger<PessoaCache>,redis:IConnectionMultiplexerPool, cache:IMemoryCache) =
+    let PESSOA = "pessoa"
+
     let subscribeAsync =
-        PessoaCache.subscribe redis APELIDO (fun message ->
-            logger.LogInformation("Received message - {}", message)
-            apelidoCache.TryAdd(message, true)|> ignore )
+        PessoaCache.subscribe redis PESSOA (fun message ->
+            let pessoa = JsonSerializer.Deserialize<Domain.Pessoa>(message, Domain.JsonOptions)
+            cache.Set(pessoa.apelido, true)|> ignore
+            cache.Set(pessoa.id, pessoa)|> ignore)
+
     interface IPessoaCache with
         member this.Add pessoa =
-            apelidoCache.TryAdd(pessoa.apelido, true) |> ignore
+            cache.Set(pessoa.apelido, true) |> ignore
+            cache.Set(pessoa.id, pessoa) |> ignore
             task {
                 let! subscriber = subscribeAsync
-                let! _ =  subscriber.PublishAsync (APELIDO, pessoa.apelido)
+                let json = JsonSerializer.Serialize(pessoa, Domain.JsonOptions)
+                let! _ =  subscriber.PublishAsync (PESSOA, json)
                 return ()
             }
-        member this.Exists pessoa = apelidoCache.ContainsKey pessoa.apelido
-        
+        member this.Exists pessoa = cache.Get(pessoa.apelido) <> null
+        member this.Get id =
+            match cache.Get(id) with
+            | null -> None
+            | :? Domain.Pessoa as pessoa -> Some pessoa
+            | _ -> None

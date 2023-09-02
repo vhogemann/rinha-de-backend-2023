@@ -19,6 +19,10 @@ Content-Type: application/json
 
 GET http://localhost:9999/{{location}}
 
+> {% 
+  client.test( () => client.assert(response.status == 200, "Wrong status code") )
+  %}
+
 ###
 
 # @name contagemPessoas
