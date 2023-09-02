@@ -12,13 +12,13 @@ module CreatePessoa =
             with exp ->
                 Error (400, exp.Message)
                         
-    let existsOnCache (cache:Cache.IApelidoCache) pessoa =
+    let existsOnCache (cache:Cache.IPessoaCache) pessoa =
         if cache.Exists pessoa then
             Error (422, "Apelido existe")
         else
             Ok pessoa
 
-let CreatePessoaHandler (queue:Queue.IPessoaInsertQueue) (apelidoCache:Cache.IApelidoCache) :HttpHandler =
+let CreatePessoaHandler (queue:Queue.IPessoaInsertQueue) (apelidoCache:Cache.IPessoaCache) :HttpHandler =
     fun ctx -> task {
         let! json = Request.getBodyString ctx
         let pessoa =

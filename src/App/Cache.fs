@@ -5,36 +5,33 @@ open System.Collections.Concurrent
 open System.Threading.Tasks
 open Microsoft.Extensions.Logging
 open StackExchange.Redis.MultiplexerPool
-module ApelidoCache =
+module PessoaCache =
     let subscribe (redis:IConnectionMultiplexerPool) (channel:string) callback = task {
         let! pool = redis.GetAsync()
         let sub = pool.Connection.GetSubscriber()
         let action = fun _ message -> callback (message |> string)
-        let! channel = sub.SubscribeAsync(channel, action)
+        do! sub.SubscribeAsync(channel, action)
         return sub
     }
      
-type IApelidoCache =
+type IPessoaCache =
     abstract Add: Domain.Pessoa -> Task<unit>
     abstract Exists: Domain.Pessoa -> bool
     
-type ApelidoCache(logger:ILogger<ApelidoCache>,redis:IConnectionMultiplexerPool) =
-    let CHANNEL = "apelido"
-    let cache = ConcurrentDictionary<String,bool>()
-   
+type PessoaCache(logger:ILogger<PessoaCache>,redis:IConnectionMultiplexerPool) =
+    let APELIDO = "apelido"
+    let apelidoCache = ConcurrentDictionary<String,bool>()
     let subscribeAsync =
-        ApelidoCache.subscribe redis CHANNEL (fun message ->
+        PessoaCache.subscribe redis APELIDO (fun message ->
             logger.LogInformation("Received message - {}", message)
-            cache.TryAdd(message, true)|> ignore )
-    
-    interface IApelidoCache with
+            apelidoCache.TryAdd(message, true)|> ignore )
+    interface IPessoaCache with
         member this.Add pessoa =
+            apelidoCache.TryAdd(pessoa.apelido, true) |> ignore
             task {
                 let! subscriber = subscribeAsync
-                let! _ =  subscriber.PublishAsync (CHANNEL, pessoa.apelido)
+                let! _ =  subscriber.PublishAsync (APELIDO, pessoa.apelido)
                 return ()
             }
-            
-        member this.Exists pessoa = cache.ContainsKey pessoa.apelido
+        member this.Exists pessoa = apelidoCache.ContainsKey pessoa.apelido
         
-    

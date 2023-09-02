@@ -17,7 +17,7 @@ let main args =
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
     let createPessoa =
-        Services.inject<Queue.IPessoaInsertQueue, Cache.IApelidoCache> Controller.CreatePessoaHandler
+        Services.inject<Queue.IPessoaInsertQueue, Cache.IPessoaCache> Controller.CreatePessoaHandler
     let getPessoa =
         Services.inject<NpgsqlConnection> Controller.GetPessoaHandler
     let searchPessoas =
@@ -37,7 +37,7 @@ let main args =
                     ConnectionMultiplexerPoolFactory.Create(
                         50,
                         config.GetConnectionString("Redis")))
-                .AddSingleton<Cache.IApelidoCache, Cache.ApelidoCache>()
+                .AddSingleton<Cache.IPessoaCache, Cache.PessoaCache>()
                 .AddLogging()
         )
        

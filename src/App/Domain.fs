@@ -36,7 +36,6 @@ let insert (conn:NpgsqlConnection) person =
     let sql = """
         INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack)
     """
-
     let param = [
         "Id", sqlGuid person.id
         "Apelido", sqlString person.apelido
@@ -44,17 +43,35 @@ let insert (conn:NpgsqlConnection) person =
         "Nascimento", sqlDateTime (person.nascimento)
         "Stack", sqlString (person.stack |> JsonSerializer.Serialize)
     ]
-    
     conn
     |> Db.newCommand sql
     |> Db.setParams param
     |> Db.Async.exec
 
-let insertBatch (logger:ILogger<'T>) (conn:NpgsqlConnection) pessoas =
+let insertBatch (logger:ILogger<'T>) (conn:NpgsqlConnection) (pessoas:Pessoa seq) =
     let sql = """ INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack) """
-    use tran = conn.TryBeginTransaction()
-    
-    
+    let param =
+        seq {
+            for pessoa in pessoas do
+                yield [
+                    "Id", sqlGuid pessoa.id
+                    "Apelido", sqlString pessoa.apelido
+                    "Nome", sqlString pessoa.nome
+                    "Nascimento", sqlDateTime (pessoa.nascimento)
+                    "Stack", sqlString (pessoa.stack |> JsonSerializer.Serialize)
+                ]
+        }
+        |> List.ofSeq
+    task {
+        use tran = conn.TryBeginTransaction()
+        do!
+            conn
+            |> Db.newCommand sql
+            |> Db.setTransaction tran
+            |> Db.Async.execMany param
+            |> Async.AwaitTask
+        tran.TryCommit()
+    }
     
 let queueInsert insert =
     let agent = MailboxProcessor<Pessoa>.Start( fun inbox ->
@@ -77,7 +94,6 @@ let fetch (conn:NpgsqlConnection) id =
     let param = [
         "Id", sqlGuid id
     ]
-    
     conn
     |> Db.newCommand sql
     |> Db.setParams param
@@ -111,7 +127,6 @@ let search (conn:NpgsqlConnection) termo =
     let param = [
         "Termo", sqlString termo
     ]
-    
     conn
     |> Db.newCommand sql
     |> Db.setParams param
@@ -119,7 +134,6 @@ let search (conn:NpgsqlConnection) termo =
     
 let count (conn:NpgsqlConnection) =
     let sql = "SELECT count(*) From \"Pessoas\""
-    
     conn
     |> Db.newCommand sql
     |> Db.Async.scalar unbox<Int64> 

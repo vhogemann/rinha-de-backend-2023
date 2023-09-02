@@ -14,12 +14,10 @@ type Message =
         | Insert of Domain.Pessoa
         | Flush
 
-type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection, cache:IApelidoCache) =
+type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection, cache:IPessoaCache) =
     let tryInsert batch loop = task {
         try
-            let! result = Domain.insertBatch logger db batch
-            logger.LogInformation("Inserted batch of {0}", result)
-            logger.LogInformation("Inserted batch of {0}", batch |> Seq.length)
+            do! Domain.insertBatch logger db batch
             return! loop List.Empty
         with exp ->
             logger.LogError(exp, "Error inserting batch of {0}", batch |> Seq.length)
@@ -49,7 +47,7 @@ type PessoaInsertQueue (logger:ILogger<PessoaInsertQueue>, db:NpgsqlConnection, 
     let _ = 
         async {
             while true do
-                do! Async.Sleep 2000
+                do! Async.Sleep 1000
                 agent.Post Flush
         } |> Async.Start
     
