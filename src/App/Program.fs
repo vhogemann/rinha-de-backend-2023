@@ -32,9 +32,9 @@ let main args =
         add_service (fun services ->
             services
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
-                .AddSingleton<Domain.IRepository, Domain.Repository>()
                 .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()
-                .AddSingleton<IConnectionMultiplexerPool>(fun _ ->
+                .AddScoped<Domain.IRepository, Domain.Repository>()
+                .AddScoped<IConnectionMultiplexerPool>(fun _ ->
                     ConnectionMultiplexerPoolFactory.Create(
                         50,
                         config.GetConnectionString("Redis")))
