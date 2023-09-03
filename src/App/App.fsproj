@@ -16,14 +16,8 @@
 
   <ItemGroup>
     <PackageReference Include="Donald" Version="10.0.1" />
-    <PackageReference Include="EntityFrameworkCore.FSharp" Version="6.0.7" />
     <PackageReference Include="Falco" Version="4.*" />
     <PackageReference Include="FSharp.SystemTextJson" Version="1.2.34" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.10">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Npgsql.DependencyInjection" Version="8.0.0-preview.4" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="7.0.4" />
     <PackageReference Include="NRedisStack" Version="0.8.1" />

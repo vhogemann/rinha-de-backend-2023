@@ -44,13 +44,12 @@ module GetPessoa =
         | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa)
         | None -> (Response.withStatusCode 404 >> Response.ofEmpty)
     
-let GetPessoaHandler db : HttpHandler =
-    fun ctx -> task {
+let GetPessoaHandler (cache:Cache.IPessoaCache) : HttpHandler =
+    fun ctx -> 
         let route = Request.getRoute ctx
         let id = route.GetGuid "id"
-        let! pessoa = Domain.fetch db id
-        return! (GetPessoa.mapResponse pessoa ctx)
-    }
+        let pessoa = cache.Get id
+        GetPessoa.mapResponse pessoa ctx
 
 let SearchPessoasHandler db : HttpHandler =
     fun ctx -> task {
