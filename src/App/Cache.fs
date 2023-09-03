@@ -20,7 +20,7 @@ type IPessoaCache =
     abstract Exists: Domain.Pessoa -> bool
     abstract Get: Guid -> Domain.Pessoa option
     
-type PessoaCache(logger:ILogger<PessoaCache>,redis:IConnectionMultiplexerPool, cache:IMemoryCache) =
+type PessoaCache(redis:IConnectionMultiplexerPool, cache:IMemoryCache) =
     let PESSOA = "pessoa"
 
     let subscribeAsync =

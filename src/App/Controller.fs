@@ -51,7 +51,7 @@ let GetPessoaHandler (cache:Cache.IPessoaCache) : HttpHandler =
         let pessoa = cache.Get id
         GetPessoa.mapResponse pessoa ctx
 
-let SearchPessoasHandler db : HttpHandler =
+let SearchPessoasHandler (repo: Domain.IRepository) : HttpHandler =
     fun ctx -> task {
         let r = Request.getQuery ctx
         let query = r.GetString "t"
@@ -59,11 +59,11 @@ let SearchPessoasHandler db : HttpHandler =
         | null 
         | "" -> return! (Response.withStatusCode 400 >> Response.ofEmpty) ctx
         | query ->
-            let! pessoas = Domain.search db query
+            let! pessoas = repo.Search query
             return!  (Response.withStatusCode 200 >> Response.ofJson pessoas) ctx
     }
     
-let CountPessoasHandler db : HttpHandler = fun ctx -> task {
-        let! count = Domain.count db
+let CountPessoasHandler (repo: Domain.IRepository) : HttpHandler = fun ctx -> task {
+        let! count = repo.Count()
         return! (Response.withStatusCode 200 >> Response.ofPlainText (count.ToString())) ctx
     }
