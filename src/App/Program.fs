@@ -16,38 +16,30 @@ let main args =
         ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional = false, reloadOnChange = true)
             .Build() :> IConfiguration
-    let createPessoa =
-        Services.inject<Queue.IPessoaInsertQueue, Cache.IPessoaCache> Controller.CreatePessoaHandler
-    let getPessoa =
-        Services.inject<Cache.IPessoaCache> Controller.GetPessoaHandler
-    let searchPessoas =
-        Services.inject<Domain.IRepository> Controller.SearchPessoasHandler
-    let countPessoas =
-        Services.inject<Domain.IRepository> Controller.CountPessoasHandler
-        
+
     webHost args {
 
         logging (fun builder -> builder.AddConsole())
         
         add_service (fun services ->
             services
+                .AddLogging()
+                .AddMemoryCache()
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
                 .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()
                 .AddScoped<Domain.IRepository, Domain.Repository>()
                 .AddScoped<IConnectionMultiplexerPool>(fun _ ->
                     ConnectionMultiplexerPoolFactory.Create(
-                        50,
+                        100,
                         config.GetConnectionString("Redis")))
                 .AddSingleton<Cache.IPessoaCache, Cache.PessoaCache>()
-                .AddLogging()
-                .AddMemoryCache()
         )
        
         endpoints [
-            post "/pessoas" createPessoa
-            get "/pessoas/{id}" getPessoa
-            get "/pessoas" searchPessoas
-            get "/contagem-pessoas" countPessoas
+            post "/pessoas" Controller.CreatePessoa.handler
+            get "/pessoas/{id}" Controller.GetPessoa.handler
+            get "/pessoas" Controller.SearchPessoa.handler
+            get "/contagem-pessoas" Controller.CountPessoas.handler
         ]
     }
     0

@@ -33,6 +33,20 @@ module Pessoa =
             stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
         }
 
+    let exists (conn:NpgsqlConnection) (apelido:string) =
+        let sql = """ SELECT count(*) FROM "Pessoas" WHERE "Apelido" = @Apelido """
+        let param = [
+            "Apelido", sqlString apelido
+        ]
+        task {
+            let! count =
+                conn
+                |> Db.newCommand sql
+                |> Db.setParams param
+                |> Db.Async.scalar unbox<Int64>
+            return count > 0L
+        }
+    
     let insertBatch (conn:NpgsqlConnection) (pessoas:Pessoa seq) =
         let sql = """ INSERT INTO "Pessoas" VALUES (@Id, @Apelido, @Nome, @Nascimento, @Stack) """
         let param =
@@ -85,11 +99,12 @@ module Pessoa =
 type IRepository =
     abstract member Insert : Pessoa seq -> Task
     abstract member Search : string -> Task<Pessoa list>
-    
     abstract member Count : unit -> Task<Int64>
+    abstract member Exists: string -> Task<bool>
     
 type Repository (conn:NpgsqlConnection) =
     interface IRepository with
         member _.Insert pessoas = Pessoa.insertBatch conn pessoas
         member _.Search termo = Pessoa.search conn termo
         member _.Count() = Pessoa.count conn
+        member _.Exists apelido = Pessoa.exists conn apelido
