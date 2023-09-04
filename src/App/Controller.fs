@@ -17,18 +17,7 @@ module CreatePessoa =
             Error (422, "Apelido existe")
         else
             Ok pessoa
-
-    // let existsOnRepository (repo:Domain.IRepository) (pessoa:Result<Domain.Pessoa, int>) =
-    //     match pessoa with
-    //    
-    //     task {
-    //         let! exists = repo.Exists pessoa
-    //         return
-    //             if exists then
-    //                 Error (422, "Apelido existe")
-    //             else
-    //                 Ok pessoa
-    //     }
+    
     let handler =
         Services.inject<Queue.IPessoaInsertQueue, Cache.IPessoaCache, Domain.IRepository> (
             fun queue cache repository->
@@ -52,18 +41,22 @@ module CreatePessoa =
         )
 
 module GetPessoa =
-    let mapResponse =
-        function
-        | Some pessoa -> (Response.withStatusCode 200 >> Response.ofJson pessoa)
-        | None -> (Response.withStatusCode 404 >> Response.ofEmpty)
-    
     let handler =
-        Services.inject<Cache.IPessoaCache>( fun cache ->
-            fun ctx -> 
+        Services.inject<Cache.IPessoaCache, Domain.IRepository>( fun cache repo ->
+            fun ctx -> task {
                 let route = Request.getRoute ctx
                 let id = route.GetGuid "id"
-                let pessoa = cache.Get id
-                mapResponse pessoa ctx
+                match cache.Get id with
+                | Some pessoa ->
+                    return! (Response.withStatusCode 200 >> Response.ofJson pessoa) ctx
+                | None ->
+                    let! pessoa = repo.Get id
+                    match pessoa with
+                    | Some pessoa ->
+                        return! (Response.withStatusCode 200 >> Response.ofJson pessoa) ctx
+                    | None ->
+                        return! (Response.withStatusCode 404 >> Response.ofEmpty) ctx
+            }
         )
 
 module SearchPessoa =

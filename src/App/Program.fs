@@ -27,8 +27,8 @@ let main args =
                 .AddMemoryCache()
                 .AddNpgsqlDataSource(config.GetConnectionString("Default"))
                 .AddSingleton<Queue.IPessoaInsertQueue, Queue.PessoaInsertQueue>()
-                .AddScoped<Domain.IRepository, Domain.Repository>()
-                .AddScoped<IConnectionMultiplexerPool>(fun _ ->
+                .AddTransient<Domain.IRepository, Domain.Repository>()
+                .AddSingleton<IConnectionMultiplexerPool>(fun _ ->
                     ConnectionMultiplexerPoolFactory.Create(
                         100,
                         config.GetConnectionString("Redis")))

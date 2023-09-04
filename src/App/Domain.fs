@@ -33,6 +33,27 @@ module Pessoa =
             stack = rd.ReadString "Stack" |> JsonSerializer.Deserialize<string[]>
         }
 
+    let get (conn:NpgsqlConnection) (id:Guid) =
+        let sql = """
+        SELECT
+          "Id", "Apelido", "Nome", "Nascimento", "Stack" 
+        FROM 
+          "Pessoas" 
+        WHERE 
+          "Id" = @Id
+        """
+        let param = [
+            "Id", sqlGuid id
+        ]
+        task {
+            let! result =
+                conn
+                |> Db.newCommand sql
+                |> Db.setParams param
+                |> Db.Async.querySingle ofDataReader
+            do! conn.CloseAsync()
+            return result
+        }
     let exists (conn:NpgsqlConnection) (apelido:string) =
         let sql = """ SELECT count(*) FROM "Pessoas" WHERE "Apelido" = @Apelido """
         let param = [
@@ -44,6 +65,7 @@ module Pessoa =
                 |> Db.newCommand sql
                 |> Db.setParams param
                 |> Db.Async.scalar unbox<Int64>
+            do! conn.CloseAsync()
             return count > 0L
         }
     
@@ -70,6 +92,7 @@ module Pessoa =
                 |> Db.Async.execMany param
                 |> Async.AwaitTask
             tran.TryCommit()
+            do! conn.CloseAsync()
         }
     
     let search (conn:NpgsqlConnection) termo =
@@ -85,19 +108,30 @@ module Pessoa =
         let param = [
             "Termo", sqlString termo
         ]
-        conn
-        |> Db.newCommand sql
-        |> Db.setParams param
-        |> Db.Async.query ofDataReader
+        task {
+            let! result =
+                conn
+                |> Db.newCommand sql
+                |> Db.setParams param
+                |> Db.Async.query ofDataReader
+            do! conn.CloseAsync()
+            return result
+        }
     
     let count (conn:NpgsqlConnection) =
         let sql = "SELECT count(*) From \"Pessoas\""
-        conn
-        |> Db.newCommand sql
-        |> Db.Async.scalar unbox<Int64>
+        task {
+            let! result = 
+                conn
+                |> Db.newCommand sql
+                |> Db.Async.scalar unbox<Int64>
+            do! conn.CloseAsync()
+            return result
+        }
     
 type IRepository =
     abstract member Insert : Pessoa seq -> Task
+    abstract member Get : Guid -> Task<Pessoa option>
     abstract member Search : string -> Task<Pessoa list>
     abstract member Count : unit -> Task<Int64>
     abstract member Exists: string -> Task<bool>
@@ -105,6 +139,7 @@ type IRepository =
 type Repository (conn:NpgsqlConnection) =
     interface IRepository with
         member _.Insert pessoas = Pessoa.insertBatch conn pessoas
+        member _.Get id = Pessoa.get conn id
         member _.Search termo = Pessoa.search conn termo
         member _.Count() = Pessoa.count conn
         member _.Exists apelido = Pessoa.exists conn apelido

@@ -16,7 +16,7 @@ services:
       resources:
         limits:
           cpus: '0.15'
-          memory: '0.4GB'
+          memory: '0.5GB'
 
   api2:
     # API - Instância 01
@@ -34,7 +34,7 @@ services:
       resources:
         limits:
           cpus: '0.15'
-          memory: '0.4GB'
+          memory: '0.5GB'
   redis:
     # Cache
     image: redis
@@ -48,7 +48,7 @@ services:
       resources:
         limits:
           cpus: '0.15'
-          memory: '0.3GB'
+          memory: '0.2GB'
   nginx:
     # Load Balancer
     image: nginx:latest
@@ -63,7 +63,7 @@ services:
       resources:
         limits:
           cpus: '0.1'
-          memory: '0.5GB'
+          memory: '0.4GB'
 
   postgres:
     # Banco de dados
