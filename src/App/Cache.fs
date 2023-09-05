@@ -4,7 +4,6 @@ open System
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.Extensions.Caching.Memory
-open Microsoft.Extensions.Logging
 open StackExchange.Redis.MultiplexerPool
 module PessoaCache =
     let subscribe (redis:IConnectionMultiplexerPool) (channel:string) callback = task {
